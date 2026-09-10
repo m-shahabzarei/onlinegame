@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameStatus {
+  DRAFT
+  ACTIVE
+  MAINTENANCE
+  ARCHIVED
+}
+
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum RoomStatus {
+  WAITING
+  STARTING
+  IN_MATCH
+  CLOSED
+  EXPIRED
+}
+
+enum GameMode {
+  SOLO
+  COOP
+}
+
+enum RoomMemberRole {
+  HOST
+  PLAYER
+}
+
+enum MatchStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  ABORTED
+}
+
+enum SessionKind {
+  USER
+  GUEST
+}
+
+enum ChallengeCadence {
+  DAILY
+  WEEKLY
+}
+
+enum CosmeticKind {
+  AVATAR_FRAME
+  BADGE
+  BANNER
+  TITLE
+  EMOTE
+  WEAPON_APPEARANCE
+  MENU_THEME
+  LOBBY_EFFECT
+}
+
+enum ReportReason {
+  ABUSE
+  CHEATING
+  HARASSMENT
+  EXPLOIT
+  OTHER
+}
+
+model User {
+  id                    String              @id @default(cuid())
+  username              String              @unique @db.VarChar(32)
+  displayName           String              @db.VarChar(64)
+  avatarUrl             String?             @db.Text
+  email                 String?             @unique @db.VarChar(320)
+  passwordHash          String?             @db.Text
+  isGuest               Boolean             @default(false)
+  bio                   String?             @db.VarChar(280)
+  locale                String?             @db.VarChar(16)
+  reducedMotion         Boolean             @default(false)
+  soundEnabled          Boolean             @default(true)
+  analyticsOptOut       Boolean             @default(false)
+  onboardingVersion     Int                 @default(0)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  hostedRooms           Room[]              @relation("RoomHost")
+  roomMemberships       RoomMember[]
+  sessions              Session[]
+  matchHistory          MatchHistory[]
+  challengeProgress     ChallengeProgress[]
+  cosmeticOwnership     UserCosmetic[]
+  submittedReports      SafetyReport[]      @relation("ReportAuthor")
+  receivedReports       SafetyReport[]      @relation("ReportTarget")
+  blocksCreated         UserBlock[]         @relation("Blocker")
+  blocksReceived        UserBlock[]         @relation("Blocked")
+}
+
+model Session {
+  id        String      @id @default(cuid())
+  tokenHash String      @unique @db.VarChar(64)
+  userId    String
+  kind      SessionKind @default(USER)
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+model Game {
+  id           String     @id @default(cuid())
+  slug         String     @unique @db.VarChar(64)
+  name         String     @db.VarChar(96)
+  description  String     @db.Text
+  status       GameStatus @default(DRAFT)
+  maxPlayers   Int        @default(2)
+  thumbnailUrl String?    @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  rooms        Room[]
+  matches      Match[]
+
+  @@index([status])
+}
+
+model Room {
+  id              String         @id @default(cuid())
+  code            String         @unique @db.VarChar(12)
+  gameId          String
+  hostUserId      String
+  visibility      RoomVisibility @default(PRIVATE)
+  status          RoomStatus     @default(WAITING)
+  maxPlayers      Int            @default(2)
+  mode            GameMode       @default(COOP)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  expiresAt       DateTime
+  stateVersion    Int            @default(0)
+  creationKey     String?        @unique @db.VarChar(64)
+  commandReceipts Json           @default("[]")
+  game            Game           @relation(fields: [gameId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  host            User           @relation("RoomHost", fields: [hostUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  members         RoomMember[]
+  matches         Match[]
+
+  @@index([gameId, status])
+  @@index([gameId, visibility, status, createdAt])
+  @@index([hostUserId, status])
+  @@index([status, expiresAt])
+}
+
+model RoomMember {
+  roomId        String
+  userId        String
+  role          RoomMemberRole @default(PLAYER)
+  ready         Boolean        @default(false)
+  joinedAt      DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  removedAt     DateTime?
+  removalReason String?        @db.VarChar(16)
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId, joinedAt])
+  @@index([roomId, ready])
+}
+
+model Match {
+  id        String         @id @default(cuid())
+  gameId    String
+  roomId    String
+  status    MatchStatus    @default(PENDING)
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  gameplay  Json?
+  game      Game           @relation(fields: [gameId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  room      Room           @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  history   MatchHistory[]
+
+  @@index([gameId, status])
+  @@index([roomId, createdAt])
+  @@index([status, createdAt])
+}
+
+model MatchHistory {
+  id              String   @id @default(cuid())
+  matchId         String
+  userId          String
+  result          String   @db.VarChar(16)
+  completedWaves  Int      @default(0)
+  score           Int      @default(0)
+  contribution    Int      @default(0)
+  kills           Int      @default(0)
+  damage          Int      @default(0)
+  revives         Int      @default(0)
+  objectives      Int      @default(0)
+  durationSeconds Int      @default(0)
+  reconnected     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
+  @@index([userId, createdAt])
+}
+
+model ChallengeDefinition {
+  id               String              @id
+  version          Int                 @default(1)
+  cadence          ChallengeCadence
+  target           Int
+  unit             String              @db.VarChar(32)
+  rewardCosmeticId String?
+  displayCopy      String              @db.VarChar(180)
+  startsAt         DateTime
+  endsAt           DateTime
+  enabled          Boolean             @default(true)
+  progress         ChallengeProgress[]
+
+  @@index([cadence, startsAt, endsAt])
+}
+
+model ChallengeProgress {
+  id              String              @id @default(cuid())
+  challengeId     String
+  userId          String
+  progress        Int                 @default(0)
+  completedAt     DateTime?
+  rewardGrantedAt DateTime?
+  updatedAt       DateTime            @updatedAt
+  challenge       ChallengeDefinition @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([userId, updatedAt])
+}
+
+model CosmeticDefinition {
+  id          String         @id
+  version     Int            @default(1)
+  kind        CosmeticKind
+  displayName String         @db.VarChar(80)
+  assetKey    String         @db.VarChar(160)
+  enabled     Boolean        @default(true)
+  ownership   UserCosmetic[]
+}
+
+model UserCosmetic {
+  userId     String
+  cosmeticId String
+  unlockedAt DateTime           @default(now())
+  equippedAt DateTime?
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic   CosmeticDefinition @relation(fields: [cosmeticId], references: [id], onDelete: Restrict)
+
+  @@id([userId, cosmeticId])
+  @@index([userId, equippedAt])
+}
+
+model SafetyReport {
+  id           String       @id @default(cuid())
+  reporterId   String
+  targetUserId String
+  matchId      String?
+  reason       ReportReason
+  details      String?      @db.VarChar(500)
+  createdAt    DateTime     @default(now())
+  reporter     User         @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: Cascade)
+  target       User         @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId, createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model UserBlock {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+}

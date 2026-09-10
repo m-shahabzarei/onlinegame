@@ -1,0 +1,426 @@
+.game {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100dvh;
+  min-height: 32rem;
+  background: var(--background);
+  color: var(--foreground);
+  overflow: hidden;
+}
+.canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+.top,
+.bottom {
+  position: absolute;
+  left: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  pointer-events: none;
+  z-index: 2;
+}
+.top {
+  top: 1.5rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.bottom {
+  bottom: 1.5rem;
+}
+.panel {
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-shadow: 0 1px 2px #000;
+  min-width: 0;
+}
+.panel strong {
+  font-weight: 650;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  color: var(--muted-foreground);
+}
+.tag {
+  font-size: 0.55rem;
+  border: 1px solid var(--border-strong);
+  padding: 0.2rem 0.35rem;
+  margin-left: 0.5rem;
+  color: var(--primary);
+}
+.connection {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  pointer-events: auto;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.health {
+  display: flex;
+  gap: 0.65rem;
+  align-items: baseline;
+}
+.health strong {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.health span {
+  font-size: 0.6rem;
+  color: var(--muted-foreground);
+}
+.healthBar {
+  height: 3px;
+  background: var(--success);
+  margin-top: 0.3rem;
+  min-width: 8rem;
+  width: 100%;
+  border: 0;
+  accent-color: var(--success);
+}
+.wave {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.combatStatus {
+  position: absolute;
+  left: 50%;
+  bottom: 10rem;
+  transform: translateX(-50%);
+  width: min(32rem, calc(100% - 2rem));
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  z-index: 2;
+  pointer-events: none;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.lifeNotice,
+.revive {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background);
+}
+.lifeNotice strong {
+  color: var(--warning);
+}
+.lifeNotice span {
+  line-height: 1.5;
+}
+.revive progress {
+  width: 100%;
+  accent-color: var(--success);
+}
+.damage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--destructive);
+  background: var(--background);
+}
+.feedback {
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+}
+.teammate {
+  min-width: 13rem;
+  max-width: 24rem;
+}
+.teammate strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teammate > span:last-child {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+.ammo {
+  margin-left: auto;
+  min-width: 14rem;
+}
+.ammo > div strong {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.ammo > div span {
+  font-size: 1.15rem;
+  color: var(--muted-foreground);
+}
+.ammo > span:last-child {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--overlay);
+  overflow-y: auto;
+}
+.card {
+  width: min(100%, 36rem);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  box-shadow: var(--elevation-dialog);
+}
+.card h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  line-height: 1.4;
+}
+.card p {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+.cardIcon {
+  color: var(--primary);
+  border: 1px solid var(--border);
+  background: var(--primary-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  width: fit-content;
+}
+.cardIcon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+.controls span {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.controls kbd {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  min-width: 4.4rem;
+  text-align: center;
+  padding: 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.2rem;
+  color: var(--foreground);
+}
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.actions > * {
+  flex: 1;
+}
+.note {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.7rem !important;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+.crosshair span {
+  position: absolute;
+  background: white;
+  box-shadow: 0 0 2px #000;
+}
+.crosshair span:nth-child(1) {
+  width: 2px;
+  height: 6px;
+  left: 11px;
+  top: 0;
+}
+.crosshair span:nth-child(2) {
+  width: 2px;
+  height: 6px;
+  left: 11px;
+  bottom: 0;
+}
+.crosshair span:nth-child(3) {
+  width: 6px;
+  height: 2px;
+  left: 0;
+  top: 11px;
+}
+.crosshair span:nth-child(4) {
+  width: 6px;
+  height: 2px;
+  right: 0;
+  top: 11px;
+}
+.crosshair b {
+  position: absolute;
+  inset: -8px;
+  text-align: center;
+  font-size: 36px;
+  line-height: 36px;
+  color: var(--success);
+  text-shadow: 0 0 3px black;
+}
+.hit span {
+  opacity: 0.5;
+}
+.setting {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.setting > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.setting output {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+.setting input {
+  width: 100%;
+  accent-color: var(--primary);
+  min-height: 2rem;
+}
+.check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+  min-height: 2rem;
+}
+.check input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--primary);
+}
+.setting input:focus-visible,
+.check input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.diagnostics {
+  position: absolute;
+  top: 6.5rem;
+  left: 1.5rem;
+  z-index: 4;
+  max-width: calc(100% - 3rem);
+  overflow: auto;
+  background: var(--background);
+  border: 1px solid var(--border);
+  padding: 0.7rem;
+  font-size: 0.65rem;
+  line-height: 1.7;
+  pointer-events: none;
+}
+@media (max-width: 767px) {
+  .top,
+  .bottom {
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+  .top {
+    top: 0.75rem;
+  }
+  .bottom {
+    bottom: 0.75rem;
+    gap: 0.5rem;
+  }
+  .top > .panel:first-child {
+    display: none;
+  }
+  .connection {
+    margin-left: auto;
+  }
+  .card {
+    padding: 1.3rem;
+    gap: 1rem;
+    margin: auto;
+  }
+  .teammate {
+    display: none;
+  }
+  .ammo {
+    min-width: 0;
+  }
+  .panel {
+    padding: 0.65rem;
+  }
+  .healthBar {
+    min-width: 5rem;
+  }
+  .controls {
+    grid-template-columns: 1fr;
+  }
+  .game {
+    min-height: 30rem;
+  }
+}
+@media (max-height: 740px) and (min-width: 768px) {
+  .card {
+    padding: 1.3rem;
+    gap: 0.65rem;
+  }
+  .cardIcon {
+    display: none;
+  }
+  .controls {
+    gap: 0.4rem;
+  }
+  .top {
+    top: 0.75rem;
+  }
+  .bottom {
+    bottom: 0.75rem;
+  }
+  .note {
+    padding-top: 0.5rem;
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "scenario": "two players, 24 mixed zombies, navigation, attacks, shooting, damage and JSON replication",
+  "simulatedSeconds": 310,
+  "measuredTicks": 9000,
+  "overBudgetTicks": 5,
+  "maxConsecutiveOverBudget": 2,
+  "minAlive": 24,
+  "maxAlive": 24,
+  "spawned": 264,
+  "tickMs": {
+    "mean": 2.493865111111101,
+    "p95": 4.40940000000046,
+    "p99": 8.796999999998661,
+    "max": 86.72359999999935
+  },
+  "aiMs": {
+    "mean": 1.8335969444444467,
+    "p95": 3.338900000002468,
+    "p99": 6.784900000000562,
+    "max": 85.8820999999989
+  },
+  "navigationMs": {
+    "mean": 0.19796206666667168,
+    "p95": 0.6094999999986612,
+    "p99": 1.1103999999977532,
+    "max": 9.09100000000035
+  },
+  "maxRequestsPerTick": 2,
+  "pathRequests": 13390,
+  "failedPaths": 0,
+  "spawnFailures": 0,
+  "maxSnapshotBytes": 8814,
+  "outboundBytesPerSecondPerClient": 117163.81129032258,
+  "outboundMessagesPerSecondPerClient": 30.338709677419356,
+  "attacks": 98,
+  "playerDamageEvents": 4,
+  "shots": 3100,
+  "memory": [
+    {
+      "simulatedSeconds": 30,
+      "heapMB": 17.720748901367188,
+      "rssMB": 77.96875
+    },
+    {
+      "simulatedSeconds": 60,
+      "heapMB": 17.79705810546875,
+      "rssMB": 78.29296875
+    },
+    {
+      "simulatedSeconds": 90,
+      "heapMB": 17.880958557128906,
+      "rssMB": 78.296875
+    },
+    {
+      "simulatedSeconds": 120,
+      "heapMB": 17.864654541015625,
+      "rssMB": 79.73046875
+    },
+    {
+      "simulatedSeconds": 150,
+      "heapMB": 17.896705627441406,
+      "rssMB": 79.83203125
+    },
+    {
+      "simulatedSeconds": 180,
+      "heapMB": 17.9373779296875,
+      "rssMB": 99.625
+    },
+    {
+      "simulatedSeconds": 210,
+      "heapMB": 17.94384765625,
+      "rssMB": 100.03515625
+    },
+    {
+      "simulatedSeconds": 240,
+      "heapMB": 18.13153839111328,
+      "rssMB": 96.78515625
+    },
+    {
+      "simulatedSeconds": 270,
+      "heapMB": 18.117828369140625,
+      "rssMB": 98.7734375
+    },
+    {
+      "simulatedSeconds": 300,
+      "heapMB": 18.186920166015625,
+      "rssMB": 95.15234375
+    }
+  ],
+  "note": "Trusted harness restores health/ammo and replaces killed zombies to sustain concurrency; it does not represent a human playtest or browser GPU measurement."
+}

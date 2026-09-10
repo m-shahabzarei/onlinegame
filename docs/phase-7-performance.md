@@ -1,0 +1,11 @@
+# Phase 7 performance, load and chaos plan
+
+Budgets are measured against the Phase 6 profile and must be re-recorded on staging hardware. Client target: 60 FPS at 1920x1080, p95 frame time at or below 16.67 ms, no sustained heap growth over 30 minutes, no duplicate loops/subscriptions, and stable boss/reconnect/shop performance. Game server target: 30 Hz simulation with p99 tick below 33.33 ms, bounded drift, reconnect within 5 seconds, bounded queues and memory, and no match starvation. Web target: route and match-bootstrap p95 below 500 ms under the documented staging load, with no private response caching.
+
+Existing Phase 5/6 profiling provides a starting point: a final 24-zombie browser capture recorded 60.2 FPS, 17.10 ms p95 frame time and 68 draw calls; the offline authority profile recorded 4.41 ms p95 and 8.80 ms p99 tick time with an 8.8 KiB maximum snapshot. These are development measurements, not a staging capacity claim; Phase 7 keeps them as regression baselines until the controlled staging hardware is available.
+
+Current safe capacity envelope: two players and the existing 24-zombie development profile on the measured local machine. A 10/25/50-room staging envelope is intentionally unclaimed until the external persistent runtime, database pool and realtime provider are available; release operators must record the highest passing tier before beta.
+
+Load tests run only locally or in staging: 10, 25 and 50 concurrent two-player rooms, exercising lobby, startup, snapshots, commands, shop/economy, objectives, boss events, reconnect, completion and cleanup. Capacity is reported as the highest scenario meeting p99 tick, error-rate, memory and readiness thresholds; a local single process is not production capacity.
+
+Chaos scenarios include 50/100/150/300 ms latency, jitter, loss, duplication/reordering, brief/full disconnect, refresh/backgrounding, pointer-lock/WebGL failure, server/provider/database restart or transient outage, expiry/version/map mismatch, duplicate commands, stale snapshots, clock skew and reconnect around victory/defeat. Each scenario must confirm idempotent purchases/rewards, stable Scrap/inventory/boss state, no duplicated entities/timers and a documented recovery path.

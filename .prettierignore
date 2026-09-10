@@ -1,0 +1,8 @@
+.next
+.next-local
+dist
+test-results
+coverage
+node_modules
+package-lock.json
+src/generated
