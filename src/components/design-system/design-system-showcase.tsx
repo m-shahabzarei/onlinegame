@@ -1,3 +1,5 @@
+"use client";
+import { useTranslations } from "@/i18n/provider";
 import {
   Bell,
   Check,
@@ -111,13 +113,13 @@ function TokenSwatch({ className, label, token }: TokenSwatchProps) {
   );
 }
 
-const selectOptions = [
-  { label: "Balanced", value: "balanced" },
-  { label: "Compact", value: "compact" },
-  { label: "High contrast", value: "contrast" },
-] as const;
-
 export function DesignSystemShowcase() {
+  const t = useTranslations();
+  const selectOptions = [
+    { label: t("platform.balanced"), value: "balanced" },
+    { label: t("platform.compact"), value: "compact" },
+    { label: t("platform.highContrast"), value: "contrast" },
+  ] as const;
   return (
     <main id="main-content" className="min-h-dvh overflow-x-clip">
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16 2xl:px-12">
@@ -129,23 +131,24 @@ export function DesignSystemShowcase() {
           <div className="relative max-w-3xl">
             <Badge variant="primary">
               <Layers3 aria-hidden="true" className="size-3.5" />
-              Internal foundation · Phase 1
+              {t("platform.dsIntroTag")}
             </Badge>
             <h1 className="font-display text-foreground mt-6 max-w-2xl text-3xl leading-tight font-bold tracking-[0.02em] sm:text-4xl lg:text-5xl">
-              TwoPlayer interface system
+              {t("platform.dsTitle")}
             </h1>
             <p className="text-muted-foreground mt-5 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8">
-              A restrained, cinematic component language for future TwoPlayer
-              surfaces. This route previews the foundation only—no lobby, room,
-              or gameplay behavior is connected.
+              {t("platform.dsIntro")}
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <StatusIndicator status="online" label="Preview ready" />
+              <StatusIndicator
+                status="online"
+                label={t("platform.previewReady")}
+              />
               <span className="text-muted-foreground font-mono text-xs tracking-[0.12em] uppercase">
                 DS / 0.1
               </span>
               <span className="text-muted-foreground font-mono text-xs tracking-[0.12em] uppercase">
-                Dark first
+                {t("platform.darkFirst")}
               </span>
             </div>
           </div>
@@ -154,49 +157,49 @@ export function DesignSystemShowcase() {
         <div className="mt-16 grid gap-16 lg:mt-20 lg:gap-24">
           <ShowcaseSection
             id="foundations"
-            eyebrow="01 / Foundations"
-            title="Color, type, and rhythm"
-            description="Semantic tokens carry meaning across components. The palette uses cool dark surfaces, precise violet hierarchy, and a controlled rose accent."
+            eyebrow={t("platform.dsFoundations")}
+            title={t("platform.colorType")}
+            description={t("platform.colorTypeHelp")}
           >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
               <TokenSwatch
                 className="bg-background"
-                label="Background"
+                label={t("platform.background")}
                 token="background"
               />
               <TokenSwatch
                 className="bg-surface-elevated"
-                label="Surface"
+                label={t("platform.surface")}
                 token="surface"
               />
               <TokenSwatch
                 className="bg-primary"
-                label="Primary"
+                label={t("platform.primary")}
                 token="primary"
               />
               <TokenSwatch
                 className="bg-secondary"
-                label="Secondary"
+                label={t("platform.secondary")}
                 token="secondary"
               />
               <TokenSwatch
                 className="bg-accent"
-                label="Accent"
+                label={t("platform.accent")}
                 token="accent"
               />
               <TokenSwatch
                 className="bg-success"
-                label="Success"
+                label={t("platform.success")}
                 token="success"
               />
               <TokenSwatch
                 className="bg-warning"
-                label="Warning"
+                label={t("platform.warning")}
                 token="warning"
               />
               <TokenSwatch
                 className="bg-destructive"
-                label="Destructive"
+                label={t("platform.destructive")}
                 token="destructive"
               />
             </div>
@@ -204,29 +207,25 @@ export function DesignSystemShowcase() {
             <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
               <Card variant="elevated">
                 <CardHeader>
-                  <CardTitle>Typography specimens</CardTitle>
-                  <CardDescription>
-                    Display, interface, technical, and Persian-capable families
-                    share a consistent metric rhythm.
-                  </CardDescription>
+                  <CardTitle>{t("platform.typeSpecimens")}</CardTitle>
+                  <CardDescription>{t("platform.typeHelp")}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-6">
                   <div>
                     <p className="text-muted-foreground font-mono text-xs tracking-[0.14em] uppercase">
-                      Display / Orbitron
+                      {t("platform.displayFont")}
                     </p>
                     <p className="font-display text-foreground mt-2 text-2xl font-semibold tracking-[0.04em] sm:text-3xl">
-                      Tactical clarity
+                      {t("platform.tacticalClarity")}
                     </p>
                   </div>
                   <Divider />
                   <div>
                     <p className="text-muted-foreground font-mono text-xs tracking-[0.14em] uppercase">
-                      Interface / Geist
+                      {t("platform.interfaceFont")}
                     </p>
                     <p className="text-foreground mt-2 max-w-xl text-base leading-7">
-                      Readable at speed, calm at rest, and clear across compact
-                      controls and longer explanations.
+                      {t("platform.readableHelp")}
                     </p>
                   </div>
                   <Divider />
@@ -243,11 +242,8 @@ export function DesignSystemShowcase() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Spacing rhythm</CardTitle>
-                  <CardDescription>
-                    A four-pixel base keeps dense controls and spacious sections
-                    in the same visual cadence.
-                  </CardDescription>
+                  <CardTitle>{t("platform.spacingRhythm")}</CardTitle>
+                  <CardDescription>{t("platform.spacingHelp")}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   {[4, 8, 16, 24, 32].map((space) => (
@@ -269,39 +265,40 @@ export function DesignSystemShowcase() {
 
           <ShowcaseSection
             id="actions"
-            eyebrow="02 / Actions"
-            title="Buttons and compact controls"
-            description="Every target is at least 44px, exposes a visible keyboard focus ring, and keeps hover, pressed, loading, and disabled feedback within a stable footprint."
+            eyebrow={t("platform.dsActions")}
+            title={t("platform.buttonsControls")}
+            description={t("platform.buttonsHelp")}
           >
             <Card>
               <CardHeader>
-                <CardTitle>Button variants</CardTitle>
+                <CardTitle>{t("platform.buttonVariants")}</CardTitle>
                 <CardDescription>
-                  Primary hierarchy stays indigo; rose is reserved for a focused
-                  high-value accent.
+                  {t("platform.buttonHierarchy")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-3">
                 <Button>
-                  Primary
+                  {t("platform.primary")}
                   <Check aria-hidden="true" className="size-4" />
                 </Button>
-                <Button variant="secondary">Secondary</Button>
-                <Button variant="accent">Accent</Button>
-                <Button variant="outline">Outline</Button>
-                <Button variant="ghost">Ghost</Button>
-                <Button variant="destructive">Destructive</Button>
+                <Button variant="secondary">{t("platform.secondary")}</Button>
+                <Button variant="accent">{t("platform.accent")}</Button>
+                <Button variant="outline">{t("platform.outline")}</Button>
+                <Button variant="ghost">{t("platform.ghost")}</Button>
+                <Button variant="destructive">
+                  {t("platform.destructive")}
+                </Button>
               </CardContent>
-              <Divider label="State examples" />
+              <Divider label={t("platform.stateExamples")} />
               <CardContent className="flex flex-wrap gap-3 pt-6">
-                <Button loading loadingText="Processing">
-                  Process
+                <Button loading loadingText={t("platform.processing")}>
+                  {t("platform.process")}
                 </Button>
                 <Button disabled variant="secondary">
-                  Disabled
+                  {t("platform.disabled")}
                 </Button>
                 <Button aria-pressed="true" variant="outline">
-                  Pressed
+                  {t("platform.pressed")}
                 </Button>
               </CardContent>
             </Card>
@@ -309,34 +306,44 @@ export function DesignSystemShowcase() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Icon buttons</CardTitle>
+                  <CardTitle>{t("platform.iconButtons")}</CardTitle>
                   <CardDescription>
-                    Each icon-only action requires an explicit accessible label.
+                    {t("platform.iconButtonsHelp")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-3">
-                  <Tooltip content="Create a new item">
-                    <IconButton label="Create item" variant="secondary">
+                  <Tooltip content={t("platform.newItem")}>
+                    <IconButton
+                      label={t("platform.createItem")}
+                      variant="secondary"
+                    >
                       <Plus aria-hidden="true" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip content="Copy reference">
-                    <IconButton label="Copy reference" variant="outline">
+                  <Tooltip content={t("platform.copyReference")}>
+                    <IconButton
+                      label={t("platform.copyReference")}
+                      variant="outline"
+                    >
                       <Copy aria-hidden="true" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip content="Notification preferences">
+                  <Tooltip content={t("platform.notificationPrefs")}>
                     <IconButton
-                      label="Notification preferences"
+                      label={t("platform.notificationPrefs")}
                       variant="ghost"
                     >
                       <Bell aria-hidden="true" />
                     </IconButton>
                   </Tooltip>
-                  <IconButton label="Loading action" loading variant="accent">
+                  <IconButton
+                    label={t("platform.loadingAction")}
+                    loading
+                    variant="accent"
+                  >
                     <RefreshCcw aria-hidden="true" />
                   </IconButton>
-                  <IconButton label="Unavailable action" disabled>
+                  <IconButton label={t("platform.unavailableAction")} disabled>
                     <Settings2 aria-hidden="true" />
                   </IconButton>
                 </CardContent>
@@ -344,35 +351,34 @@ export function DesignSystemShowcase() {
 
               <Card variant="elevated">
                 <CardHeader>
-                  <CardTitle>Dialog</CardTitle>
-                  <CardDescription>
-                    Radix manages focus trapping, Escape dismissal, and return
-                    focus while the visual layer remains provider-neutral.
-                  </CardDescription>
+                  <CardTitle>{t("platform.dialog")}</CardTitle>
+                  <CardDescription>{t("platform.dialogHelp")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="outline">Open dialog preview</Button>
+                      <Button variant="outline">
+                        {t("platform.openDialogPreview")}
+                      </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Confirm interface choice</DialogTitle>
+                        <DialogTitle>{t("platform.confirmChoice")}</DialogTitle>
                         <DialogDescription>
-                          This preview demonstrates focus management and action
-                          hierarchy. It does not save or trigger a product flow.
+                          {t("platform.previewDialogHelp")}
                         </DialogDescription>
                       </DialogHeader>
                       <div className="border-border bg-muted text-muted-foreground rounded-md border p-4 text-sm leading-6">
-                        Dialog content stays readable against a strong scrim and
-                        uses restrained blur only to separate layers.
+                        {t("platform.dialogContentHelp")}
                       </div>
                       <DialogFooter>
                         <DialogClose asChild>
-                          <Button variant="ghost">Cancel</Button>
+                          <Button variant="ghost">
+                            {t("platform.cancel")}
+                          </Button>
                         </DialogClose>
                         <DialogClose asChild>
-                          <Button>Confirm preview</Button>
+                          <Button>{t("platform.confirmPreview")}</Button>
                         </DialogClose>
                       </DialogFooter>
                     </DialogContent>
@@ -384,33 +390,33 @@ export function DesignSystemShowcase() {
 
           <ShowcaseSection
             id="forms"
-            eyebrow="03 / Forms"
-            title="Inputs and selection"
-            description="Labels remain visible, helper and recovery text sit next to their controls, and error meaning is never communicated by color alone."
+            eyebrow={t("platform.dsForms")}
+            title={t("platform.inputsSelection")}
+            description={t("platform.inputsHelp")}
           >
             <Card variant="elevated">
               <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
                 <Input
-                  label="Display label"
-                  description="Use a concise, recognizable interface name."
-                  placeholder="Enter a label"
+                  label={t("platform.displayLabel")}
+                  description={t("platform.displayLabelHelp")}
+                  placeholder={t("platform.enterLabel")}
                   leadingIcon={<Mail aria-hidden="true" />}
                 />
                 <Select
-                  label="Interface density"
-                  description="This changes the preview only."
+                  label={t("platform.interfaceDensity")}
+                  description={t("platform.previewOnly")}
                   defaultValue="balanced"
                   options={selectOptions}
                 />
                 <Input
-                  label="Validation example"
-                  defaultValue="Unsupported value"
-                  error="Choose a value that uses letters and numbers only."
+                  label={t("platform.validationExample")}
+                  defaultValue={t("platform.unsupportedValue")}
+                  error={t("platform.validationHelp")}
                   leadingIcon={<Search aria-hidden="true" />}
                 />
                 <Input
-                  label="Disabled field"
-                  defaultValue="Unavailable in this phase"
+                  label={t("platform.disabledField")}
+                  defaultValue={t("platform.unavailablePhase")}
                   disabled
                   leadingIcon={<SlidersHorizontal aria-hidden="true" />}
                 />
@@ -420,47 +426,49 @@ export function DesignSystemShowcase() {
 
           <ShowcaseSection
             id="surfaces"
-            eyebrow="04 / Surfaces"
-            title="Cards, badges, identity, and status"
-            description="Subtle borders and controlled elevation establish depth. Status examples include text labels so meaning never depends on hue alone."
+            eyebrow={t("platform.dsSurfaces")}
+            title={t("platform.cardsIdentity")}
+            description={t("platform.surfaceHelp")}
           >
             <Tabs defaultValue="cards">
-              <TabsList aria-label="Surface primitive examples">
-                <TabsTrigger value="cards">Cards</TabsTrigger>
-                <TabsTrigger value="labels">Labels</TabsTrigger>
-                <TabsTrigger value="identity">Identity</TabsTrigger>
+              <TabsList aria-label={t("platform.surfaceExamples")}>
+                <TabsTrigger value="cards">{t("platform.cards")}</TabsTrigger>
+                <TabsTrigger value="labels">{t("platform.labels")}</TabsTrigger>
+                <TabsTrigger value="identity">
+                  {t("platform.identity")}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="cards">
                 <div className="grid gap-4 md:grid-cols-3">
                   <Card padding="md">
-                    <Badge size="sm">Default</Badge>
+                    <Badge size="sm">{t("platform.default")}</Badge>
                     <h3 className="font-display text-foreground mt-5 text-base font-semibold">
-                      Standard surface
+                      {t("platform.standardSurface")}
                     </h3>
                     <p className="text-muted-foreground mt-2 text-sm leading-6">
-                      Low elevation for ordinary content grouping.
+                      {t("platform.standardSurfaceHelp")}
                     </p>
                   </Card>
                   <Card padding="md" variant="elevated">
                     <Badge size="sm" variant="primary">
-                      Elevated
+                      {t("platform.elevated")}
                     </Badge>
                     <h3 className="font-display text-foreground mt-5 text-base font-semibold">
-                      Priority surface
+                      {t("platform.prioritySurface")}
                     </h3>
                     <p className="text-muted-foreground mt-2 text-sm leading-6">
-                      Stronger separation without an excessive glow.
+                      {t("platform.prioritySurfaceHelp")}
                     </p>
                   </Card>
                   <Card padding="md" variant="subtle">
                     <Badge size="sm" variant="outline">
-                      Subtle
+                      {t("platform.subtle")}
                     </Badge>
                     <h3 className="font-display text-foreground mt-5 text-base font-semibold">
-                      Quiet surface
+                      {t("platform.quietSurface")}
                     </h3>
                     <p className="text-muted-foreground mt-2 text-sm leading-6">
-                      Recedes when surrounding content needs priority.
+                      {t("platform.quietSurfaceHelp")}
                     </p>
                   </Card>
                 </div>
@@ -468,13 +476,15 @@ export function DesignSystemShowcase() {
               <TabsContent value="labels">
                 <Card padding="md">
                   <div className="flex flex-wrap gap-3">
-                    <Badge>Neutral</Badge>
-                    <Badge variant="primary">Primary</Badge>
-                    <Badge variant="accent">Accent</Badge>
-                    <Badge variant="success">Success</Badge>
-                    <Badge variant="warning">Warning</Badge>
-                    <Badge variant="destructive">Destructive</Badge>
-                    <Badge variant="outline">Outline</Badge>
+                    <Badge>{t("platform.neutral")}</Badge>
+                    <Badge variant="primary">{t("platform.primary")}</Badge>
+                    <Badge variant="accent">{t("platform.accent")}</Badge>
+                    <Badge variant="success">{t("platform.success")}</Badge>
+                    <Badge variant="warning">{t("platform.warning")}</Badge>
+                    <Badge variant="destructive">
+                      {t("platform.destructive")}
+                    </Badge>
+                    <Badge variant="outline">{t("platform.outline")}</Badge>
                   </div>
                 </Card>
               </TabsContent>
@@ -485,28 +495,28 @@ export function DesignSystemShowcase() {
                       <Avatar
                         size="sm"
                         role="img"
-                        aria-label="Small avatar example"
+                        aria-label={t("platform.smallAvatar")}
                       >
                         <AvatarFallback>TP</AvatarFallback>
                       </Avatar>
                       <Avatar
                         size="md"
                         role="img"
-                        aria-label="Medium avatar example"
+                        aria-label={t("platform.mediumAvatar")}
                       >
                         <AvatarFallback>TP</AvatarFallback>
                       </Avatar>
                       <Avatar
                         size="lg"
                         role="img"
-                        aria-label="Large avatar example"
+                        aria-label={t("platform.largeAvatar")}
                       >
                         <AvatarFallback>TP</AvatarFallback>
                       </Avatar>
                       <Avatar
                         size="xl"
                         role="img"
-                        aria-label="Extra-large avatar example"
+                        aria-label={t("platform.largeAvatar")}
                       >
                         <AvatarFallback>TP</AvatarFallback>
                       </Avatar>
@@ -525,12 +535,12 @@ export function DesignSystemShowcase() {
 
           <ShowcaseSection
             id="feedback"
-            eyebrow="05 / Feedback"
-            title="Loading, empty, and error conventions"
-            description="Reserved skeleton geometry prevents layout shift. Empty and error states explain what happened and offer a clear next action."
+            eyebrow={t("platform.dsFeedback")}
+            title={t("platform.feedbackConventions")}
+            description={t("platform.feedbackHelp")}
           >
             <div className="grid gap-4 lg:grid-cols-3">
-              <Card aria-busy="true" aria-label="Loading content preview">
+              <Card aria-busy="true" aria-label={t("platform.loadingPreview")}>
                 <CardHeader>
                   <Skeleton className="h-4 w-24" radius="full" />
                   <Skeleton className="h-7 w-2/3" />
@@ -544,22 +554,22 @@ export function DesignSystemShowcase() {
               </Card>
 
               <EmptyState
-                title="Nothing to preview"
-                description="Clear the active filters or create a new component sample."
+                title={t("platform.nothingPreview")}
+                description={t("platform.emptyPreviewHelp")}
                 action={
                   <Button size="sm" variant="outline">
-                    Clear filters
+                    {t("platform.clearFilters")}
                   </Button>
                 }
               />
 
               <ErrorState
-                title="Preview unavailable"
-                description="The sample could not be rendered. Retry the local preview."
+                title={t("platform.previewUnavailable")}
+                description={t("platform.previewErrorHelp")}
                 action={
                   <Button size="sm" variant="outline">
                     <RefreshCcw aria-hidden="true" className="size-4" />
-                    Retry
+                    {t("platform.retry")}
                   </Button>
                 }
               />
@@ -569,9 +579,9 @@ export function DesignSystemShowcase() {
 
         <footer className="border-border mt-16 border-t pt-6 lg:mt-24">
           <div className="text-muted-foreground flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <p>TwoPlayer design-system preview · Product foundation only</p>
+            <p>{t("platform.dsFooter")}</p>
             <p className="font-mono text-xs tracking-[0.1em] uppercase">
-              44px targets / AA contrast / reduced motion
+              {t("platform.dsStandards")}
             </p>
           </div>
         </footer>

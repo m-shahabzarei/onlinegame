@@ -1,8 +1,10 @@
 "use server";
+import { actionMessageCode, semanticFieldErrors } from "@/i18n/action-messages";
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, isLocale } from "@/i18n";
+import { updateLocaleAction } from "./locale";
 
 import { getAuthService } from "@/server/auth";
 import { getStrictCurrentUser } from "@/server/dal/session";
@@ -25,7 +27,7 @@ export async function updateSettingsAction(
         ok: false,
         error: {
           code: "UNAUTHENTICATED",
-          message: "Sign in to update your preferences.",
+          message: "signInPreferences",
         },
       };
     }
@@ -42,9 +44,9 @@ export async function updateSettingsAction(
         ok: false,
         error: {
           ...(result.error.code ? { code: result.error.code } : {}),
-          message: result.error.message,
+          message: actionMessageCode(result.error.message, result.error.code),
           ...(result.error.fieldErrors
-            ? { fieldErrors: result.error.fieldErrors }
+            ? { fieldErrors: semanticFieldErrors(result.error.fieldErrors) }
             : {}),
         },
       };
@@ -53,39 +55,26 @@ export async function updateSettingsAction(
     revalidatePath("/settings");
     revalidatePath("/profile");
     if (isLocale(requestedLocale)) {
-      try {
-        (await cookies()).set(LOCALE_COOKIE, requestedLocale, {
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365,
-          sameSite: "lax",
-        });
-      } catch {
-        // Cookie writes are unavailable in isolated action tests and some edge runtimes;
-        // the authenticated preference remains durable in User.locale.
-      }
+      (await cookies()).set(LOCALE_COOKIE, requestedLocale, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+      revalidatePath("/", "layout");
     }
-    return { ok: true, message: "Preferences saved." };
+    return { ok: true, message: "preferencesSaved" };
   } catch {
     return {
       ok: false,
       error: {
         code: "AUTH_UNAVAILABLE",
-        message: "We could not save your preferences. Try again shortly.",
+        message: "preferencesFailure",
       },
     };
   }
 }
 
 export async function setGuestLocale(locale: string) {
-  if (!isLocale(locale)) return;
-  try {
-    (await cookies()).set(LOCALE_COOKIE, locale, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
-    });
-  } catch {
-    return;
-  }
-  revalidatePath("/", "layout");
+  return updateLocaleAction(locale);
 }

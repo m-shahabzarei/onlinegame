@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 2 as const;
+export const PROTOCOL_VERSION = 3 as const;
 export const MAP_ID = "quarantine-yard" as const;
 export const MAP_VERSION = 2 as const;
 export const simulationConfigSchema = z
@@ -44,24 +44,6 @@ export const MOVEMENT = Object.freeze({
   eyeInset: 0.16,
   skin: 0.015,
   maxSlope: Math.PI / 4,
-});
-export const RIFLE = Object.freeze({
-  id: "ar-01",
-  name: "AR-01 / Service rifle",
-  magazine: 30,
-  reserve: 120,
-  fireMode: "automatic",
-  fireIntervalMs: 150,
-  reloadMs: 1800,
-  range: 65,
-  baseSpread: 0.001,
-  movementSpread: 0.004,
-  recoilPitch: 0.012,
-  targetDamage: 25,
-  impactEffect: "metal-spark",
-  fireAudio: "synth-rifle",
-  reloadAudio: "synth-reload",
-  emptyAudio: "synth-empty",
 });
 export const LIMITS = Object.freeze({
   payloadBytes: 4096,

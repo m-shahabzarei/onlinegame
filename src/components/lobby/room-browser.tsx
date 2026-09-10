@@ -1,4 +1,8 @@
 "use client";
+import { lobbyErrorMessage } from "@/i18n/lobby-messages";
+import { useLocale } from "@/i18n/provider";
+import { createTranslator, formatDate } from "@/i18n/client";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,27 +40,31 @@ import { errorMessage, lobbyRequest, sendLobbyCommand } from "./client";
 import { ConnectionBanner } from "./shared";
 import { useLobbyConnection } from "./use-lobby-connection";
 import { clientTranslate } from "@/i18n/client";
+import { catalogCopy } from "@/i18n/catalog";
 import type { Locale } from "@/i18n/messages";
 
 export function RoomBrowser({
   slug,
-  name,
-  locale = "en",
+  name: sourceName,
+  locale: explicitLocale,
 }: {
   slug: string;
   name: string;
   locale?: Locale;
 }) {
-  const t = (
-    key: `common.${keyof typeof import("@/i18n/messages").messages.en.common & string}`,
-  ) => clientTranslate(locale, key);
+  const contextLocale = useLocale();
+  const locale = explicitLocale ?? contextLocale;
+  const t = createTranslator(locale);
+  const name = catalogCopy(locale, slug).name;
+  void sourceName;
+
   const router = useRouter();
   const query = useSearchParams();
   const [rooms, setRooms] = useState<PublicRoom[] | null>(null);
   const [currentCode, setCurrentCode] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [code, setCode] = useState("");
-  const [codeError, setCodeError] = useState("");
+  const [codeError, setCodeError] = useState(false);
   const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
@@ -100,10 +108,10 @@ export function RoomBrowser({
   function join(value: string) {
     const parsed = inviteCodeSchema.safeParse(value);
     if (!parsed.success) {
-      setCodeError("Enter the eight-character code from your invite.");
+      setCodeError(true);
       return;
     }
-    setCodeError("");
+    setCodeError(false);
     void run({
       type: "join",
       code: parsed.data,
@@ -119,22 +127,19 @@ export function RoomBrowser({
         href={`/games/${slug}`}
         className={buttonVariants({ variant: "ghost", size: "sm" })}
       >
-        <ArrowLeft aria-hidden="true" className="size-4" />
+        <ArrowLeft aria-hidden="true" className="size-4 rtl:rotate-180" />
         {t("common.backToGame")}
       </Link>
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div className="space-y-3">
           <p className="text-primary font-mono text-xs tracking-widest uppercase">
-            {locale === "fa" ? "آماده‌سازی نشست" : "Session preparation"}
+            {t("platform.preparation")}
           </p>
           <h1 className="font-display text-3xl sm:text-4xl">
-            Choose solo play or find your second player.
+            {t("platform.chooseModeTitle")}
           </h1>
           <p className="text-muted-foreground">
-            {name} · {t("common.publicRoom")} ·{" "}
-            {locale === "fa"
-              ? "اتاق‌های تک‌نفره و همکاری"
-              : "Solo and co-op rooms"}
+            {name} · {t("common.publicRoom")} · {t("platform.roomModes")}
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -148,7 +153,8 @@ export function RoomBrowser({
             <DialogHeader>
               <DialogTitle>{t("common.createRoom")}</DialogTitle>
               <DialogDescription>
-                {name}. Invite one partner and prepare your session.
+                {name}
+                {t("platform.invitePartner")}
               </DialogDescription>
             </DialogHeader>
             <form
@@ -166,9 +172,7 @@ export function RoomBrowser({
             >
               <fieldset className="space-y-3">
                 <legend className="mb-2 font-semibold">
-                  {locale === "fa"
-                    ? "چگونه بازی می‌کنید؟"
-                    : "How do you want to play?"}
+                  {t("platform.howPlay")}
                 </legend>
                 {(["solo", "coop"] as const).map((value) => (
                   <label
@@ -201,9 +205,7 @@ export function RoomBrowser({
               </fieldset>
               <fieldset className="space-y-3">
                 <legend className="mb-2 font-semibold">
-                  {locale === "fa"
-                    ? "چه کسی می‌تواند وارد شود؟"
-                    : "Who can join?"}
+                  {t("platform.whoJoin")}
                 </legend>
                 {(["PUBLIC", "PRIVATE"] as const).map((value) => (
                   <label
@@ -226,8 +228,8 @@ export function RoomBrowser({
                       </span>
                       <span className="text-muted-foreground text-sm">
                         {value === "PUBLIC"
-                          ? "Appears in the room browser. Anyone with a session can join."
-                          : "Hidden from the browser. Only share the invite with your partner."}
+                          ? t("platform.publicRoomHelp")
+                          : t("platform.privateRoomHelp")}
                       </span>
                     </span>
                   </label>
@@ -235,7 +237,7 @@ export function RoomBrowser({
               </fieldset>
               {error && (
                 <p role="alert" className="text-destructive text-sm">
-                  {error}
+                  {lobbyErrorMessage(locale, error)}
                 </p>
               )}
               <div className="flex flex-wrap gap-3">
@@ -245,7 +247,7 @@ export function RoomBrowser({
                   loading={pending}
                   loadingText={t("common.creating")}
                 >
-                  Create room
+                  {t("platform.createRoom")}
                 </Button>
                 <DialogClose asChild>
                   <Button variant="outline" disabled={pending}>
@@ -263,16 +265,12 @@ export function RoomBrowser({
           padding="sm"
           className="flex flex-wrap items-center justify-between gap-3"
         >
-          <p>
-            {locale === "fa"
-              ? "یک اتاق در حال اجرا دارید."
-              : "You have a room in progress."}
-          </p>
+          <p>{t("platform.roomInProgress")}</p>
           <Link
             className={buttonVariants({ variant: "outline", size: "sm" })}
             href={`/rooms/${currentCode}`}
           >
-            {locale === "fa" ? "بازگشت به لابی" : "Return to your lobby"}
+            {t("platform.returnLobby")}
           </Link>
         </Card>
       )}
@@ -287,18 +285,15 @@ export function RoomBrowser({
           <Input
             label={t("common.inviteCode")}
             placeholder="ABCD 2345"
+            dir="ltr"
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
             maxLength={32}
             value={code}
             onChange={(event) => setCode(event.target.value)}
-            error={codeError || undefined}
-            description={
-              locale === "fa"
-                ? "فاصله، خط تیره و بزرگی حروف نادیده گرفته می‌شود."
-                : "Codes ignore spaces, hyphens, and letter case."
-            }
+            error={codeError ? t("platform.invalidInvite") : undefined}
+            description={t("platform.codeHint")}
             className="font-mono"
           />
           <Button
@@ -317,7 +312,7 @@ export function RoomBrowser({
       {error && !open && (
         <Card padding="sm" className="space-y-3">
           <p role="alert" className="text-destructive">
-            {error}
+            {lobbyErrorMessage(locale, error)}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -336,7 +331,7 @@ export function RoomBrowser({
               className={buttonVariants({ variant: "ghost", size: "sm" })}
               href={`/login?next=${encodeURIComponent(`/games/${slug}/rooms`)}`}
             >
-              {locale === "fa" ? "بازیابی نشست" : "Restore session"}
+              {t("platform.restoreSession")}
             </Link>
           </div>
         </Card>
@@ -382,27 +377,26 @@ export function RoomBrowser({
                 <div className="flex items-center justify-between gap-3">
                   <Badge>
                     {room.mode === "solo"
-                      ? locale === "fa"
-                        ? "اتاق تک‌نفره"
-                        : "Solo room"
+                      ? t("platform.soloRoom")
                       : room.occupancy === room.maxPlayers
-                        ? locale === "fa"
-                          ? "اتاق پر"
-                          : "Full room"
-                        : locale === "fa"
-                          ? "در انتظار هم‌تیمی"
-                          : "Waiting for partner"}
+                        ? t("platform.fullRoom")
+                        : t("platform.waitingPartner")}
                   </Badge>
                   <span className="text-muted-foreground flex items-center gap-2 text-sm">
                     <UsersRound aria-hidden="true" className="size-4" />
-                    {room.occupancy}/{room.maxPlayers}
+                    {t("platform.capacity", {
+                      count: room.occupancy,
+                      maximum: room.maxPlayers,
+                    })}
                   </span>
                 </div>
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar>
                     <AvatarImage
                       src={room.host.avatarUrl ?? undefined}
-                      alt={`${room.host.displayName} avatar`}
+                      alt={t("platform.avatar", {
+                        name: room.host.displayName,
+                      })}
                     />
                     <AvatarFallback>
                       {room.host.displayName.slice(0, 2)}
@@ -410,23 +404,21 @@ export function RoomBrowser({
                   </Avatar>
                   <div className="min-w-0">
                     <h3 className="text-lg font-semibold break-words">
-                      {room.host.displayName}’s room
+                      {t("platform.hostRoom", { name: room.host.displayName })}
                     </h3>
                     <p className="text-muted-foreground text-sm">
-                      {locale === "fa" ? "میزبان" : "Host"}
-                      {room.host.isGuest
-                        ? locale === "fa"
-                          ? " · مهمان"
-                          : " · Guest"
-                        : ""}
+                      {t("platform.host")}
+                      {room.host.isGuest ? t("platform.guestSuffix") : ""}
                     </p>
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  {room.readyCount} ready · Created{" "}
-                  {new Date(room.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
+                  {t("platform.roomCreated", {
+                    count: room.readyCount,
+                    time: formatDate(locale, room.createdAt, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
                   })}
                 </p>
                 <Button
@@ -448,24 +440,18 @@ export function RoomBrowser({
                 className="text-primary mx-auto size-8"
               />
               <h3 className="font-display text-xl">
-                {locale === "fa"
-                  ? "تیم شما از اینجا شروع می‌شود."
-                  : "Your squad starts here."}
+                {t("platform.roomEmptyTitle")}
               </h3>
               <p className="text-muted-foreground">
-                {onlyOpen
-                  ? "No public rooms have space right now."
-                  : "No public rooms are waiting right now."}{" "}
-                {locale === "fa"
-                  ? "یک اتاق بسازید و هم‌تیمی خود را دعوت کنید."
-                  : "Create a room and invite your partner."}
+                {onlyOpen ? t("platform.noRoomSpace") : t("platform.noRooms")}{" "}
+                {t("platform.inviteRoomHelp")}
               </p>
               <Button
                 variant="outline"
                 disabled={disabled}
                 onClick={() => setOpen(true)}
               >
-                {locale === "fa" ? "ساخت اولین اتاق" : "Create the first room"}
+                {t("platform.createFirstRoom")}
               </Button>
             </Card>
           )
@@ -473,8 +459,7 @@ export function RoomBrowser({
       </section>
       <p className="text-muted-foreground flex items-start gap-2 text-sm">
         <LockKeyhole aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        Private rooms are only accessible through an invite. This phase prepares
-        sessions; gameplay arrives in Phase 4.
+        {t("platform.privateInviteHelp")}
       </p>
     </div>
   );

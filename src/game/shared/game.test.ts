@@ -3,14 +3,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { newLife, emptyPvE } from "./pve";
 import { SPAWNS } from "./arena";
-import {
-  LIMITS,
-  MOVEMENT,
-  RIFLE,
-  SIMULATION,
-  simulationConfigSchema,
-} from "./config";
+import { LIMITS, MOVEMENT, SIMULATION, simulationConfigSchema } from "./config";
 import { terminalState, transition } from "./lifecycle";
+import { resolveWeaponStats } from "./phase6";
 import {
   ArenaPhysics,
   createMotion,
@@ -84,11 +79,11 @@ describe("strict shared gameplay contract", () => {
         .success,
     ).toBe(false);
     expect(
-      clientMessageSchema.safeParse({ v: 2, type: "damage" }).success,
+      clientMessageSchema.safeParse({ v: 3, type: "damage" }).success,
     ).toBe(false);
   });
   it("roundtrips authoritative snapshots without private identities", () => {
-    const value = { v: 2, type: "worldSnapshot", snapshot: snapshot(1, 10, 0) };
+    const value = { v: 3, type: "worldSnapshot", snapshot: snapshot(1, 10, 0) };
     expect(
       serverMessageSchema.parse(JSON.parse(JSON.stringify(value))),
     ).toEqual(value);
@@ -402,8 +397,8 @@ describe("one server-owned rifle", () => {
     expect(() => fireWeapon(w, 2, 1600)).toThrow("RELOADING");
     expect(completeReload(w, end - 1)).toBe(false);
     expect(completeReload(w, end)).toBe(true);
-    expect(w.magazine).toBe(RIFLE.magazine);
-    expect(w.reserve).toBe(RIFLE.reserve - 1);
+    expect(w.magazine).toBe(resolveWeaponStats("ar-01", 0).magazineCapacity);
+    expect(w.reserve).toBe(resolveWeaponStats("ar-01", 0).reserveCapacity - 1);
     expect(completeReload(w, end + 1)).toBe(false);
   });
 });

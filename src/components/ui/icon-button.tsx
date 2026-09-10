@@ -61,7 +61,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       ref={ref}
       type={type}
       aria-busy={loading || undefined}
-      aria-label={loading ? `${label}, loading` : label}
+      aria-label={label}
       className={cn(iconButtonVariants({ size, variant }), className)}
       disabled={disabled || loading}
     >

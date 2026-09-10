@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PROTOCOL_VERSION } from "@/game/shared/config";
 
 export const dynamic = "force-static";
 export function GET() {
@@ -6,7 +7,7 @@ export function GET() {
     {
       service: "twoplayer-web",
       version: process.env.npm_package_version ?? "0.1.0",
-      protocol: 2,
+      protocol: PROTOCOL_VERSION,
     },
     {
       headers: {

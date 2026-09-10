@@ -112,7 +112,7 @@ describe("real WebSocket service integration", () => {
       );
       ws.on("error", () => {});
       await new Promise<void>((resolve) => ws.once("open", resolve));
-      c.send({ v: 2, type: "join", token });
+      c.send({ v: 3, type: "join", token });
       return c;
     }
     return { reservation, ticket, client, lifecycle, url, wsUrl };
@@ -160,7 +160,7 @@ describe("real WebSocket service integration", () => {
     for (const c of [a, b]) {
       await until(() => c.messages.find((m) => m.type === "welcome"));
       c.send({
-        v: 2,
+        v: 3,
         type: "clientReady",
         mapId: "quarantine-yard",
         mapVersion: 2,
@@ -189,13 +189,21 @@ describe("real WebSocket service integration", () => {
     a.send(neutralInput(11, 999999));
     await until(() => a.messages.find((m) => m.type === "movementCorrection"));
     Object.assign(match.players[0]!.state.position, { x: -7, y: 0.015, z: 14 });
-    a.send({ v: 2, type: "fire", seq: 1, tick: match.tick, yaw: 0, pitch: 0 });
+    a.send({
+      v: 3,
+      type: "fire",
+      triggerSeq: 1,
+      seq: 1,
+      tick: match.tick,
+      yaw: 0,
+      pitch: 0,
+    });
     expect(
       await until(() =>
         a.messages.find((m) => m.type === "shotConfirmed" && m.seq === 1),
       ),
     ).toMatchObject({ targetId: "plate-a", weapon: { magazine: 29 } });
-    a.send({ v: 2, type: "reload", seq: 1 });
+    a.send({ v: 3, type: "reload", seq: 1 });
     await until(() =>
       a.messages.find(
         (m) => m.type === "weaponState" && m.event === "reloadCompleted",
@@ -217,7 +225,7 @@ describe("real WebSocket service integration", () => {
     if (welcome.type !== "welcome") throw new Error("Expected welcome");
     expect(welcome.snapshot.players[0]!.weapon).toEqual(before.weapon);
     resumed.send({
-      v: 2,
+      v: 3,
       type: "clientReady",
       mapId: "quarantine-yard",
       mapVersion: 2,
@@ -225,8 +233,9 @@ describe("real WebSocket service integration", () => {
     await until(() => (match.state === "PLAYING" ? true : undefined));
     for (let seq = 2; seq < 16; seq++)
       resumed.send({
-        v: 2,
+        v: 3,
         type: "fire",
+        triggerSeq: 1,
         seq,
         tick: match.tick,
         yaw: 0,
@@ -238,7 +247,7 @@ describe("real WebSocket service integration", () => {
       ),
     );
     expect(match.players.every((p) => p.state.health === 100)).toBe(true);
-    resumed.send({ v: 2, type: "leaveMatch" });
+    resumed.send({ v: 3, type: "leaveMatch" });
     await until(() => (match.state === "ENDED" ? true : undefined));
     await until(() => (f.lifecycle.includes("ENDED") ? true : undefined));
   }, 15000);

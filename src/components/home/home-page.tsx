@@ -1,3 +1,6 @@
+"use client";
+import { useTranslations } from "@/i18n/provider";
+
 import {
   ArrowRight,
   Check,
@@ -31,36 +34,37 @@ export interface HomePageProps {
   user: SafeUser | null;
 }
 
-const comingSoon = [
-  {
-    icon: LockKeyhole,
-    title: "Private rooms",
-    description: "Available now. Create a focused room for your partner.",
-  },
-  {
-    icon: Link2,
-    title: "Invite links",
-    description: "Available now. Share a secure path to your room.",
-  },
-  {
-    icon: UsersRound,
-    title: "Co-op matchmaking",
-    description:
-      "Planned for a later phase. Automatic partner selection is not available.",
-  },
-  {
-    icon: Mic2,
-    title: "Voice chat",
-    description: "Not available. TwoPlayer does not include voice chat.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Match history",
-    description: "Available now. Review completed runs and team milestones.",
-  },
-] as const;
-
 export function HomePage({ featuredGames, user }: HomePageProps) {
+  const t = useTranslations();
+
+  const comingSoon = [
+    {
+      icon: LockKeyhole,
+      title: t("platform.privateRooms"),
+      description: t("platform.privateRoomsHelp"),
+    },
+    {
+      icon: Link2,
+      title: t("platform.inviteLinks"),
+      description: t("platform.inviteLinksHelp"),
+    },
+    {
+      icon: UsersRound,
+      title: t("platform.matchmaking"),
+      description: t("platform.matchmakingHelp"),
+    },
+    {
+      icon: Mic2,
+      title: t("platform.voiceChat"),
+      description: t("platform.voiceChatHelp"),
+    },
+    {
+      icon: ShieldCheck,
+      title: t("platform.matchHistory"),
+      description: t("platform.matchHistoryHelp"),
+    },
+  ] as const;
+
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 pb-8 sm:px-6 lg:px-8 2xl:px-12">
       <section className="relative isolate overflow-hidden py-12 sm:py-16 lg:py-24">
@@ -84,21 +88,24 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
             className="font-mono tracking-[0.12em] uppercase"
           >
             <Swords aria-hidden="true" className="size-3.5" />
-            Cooperative sessions, live now
+            {t("platform.liveSessions")}
           </Badge>
           <h1 className="font-display text-foreground mt-6 max-w-3xl text-4xl leading-[1.08] font-bold tracking-[0.015em] sm:text-5xl lg:text-7xl">
-            Make the next run <span className="text-primary">count.</span>
+            {t("platform.homeTitle")}
+            <span className="text-primary">
+              {t("platform.homeTitleAccent")}
+            </span>
           </h1>
           <p className="text-muted-foreground mt-6 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8">
-            TwoPlayer is a focused home for cooperative games: choose a world,
-            find your rhythm, and take on the hard moments together. Discovery,
-            rooms and cooperative gameplay are available today. Find a partner,
-            prepare together, and make the next run count.
+            {t("platform.homeIntro")}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link href="/games" className={buttonVariants({ size: "lg" })}>
-              Explore games
-              <ArrowRight aria-hidden="true" className="size-5" />
+              {t("platform.exploreGames")}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-5 rtl:rotate-180"
+              />
             </Link>
             <Link
               href={user ? "/profile" : "/continue-as-guest"}
@@ -107,17 +114,17 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
                 "text-muted-foreground",
               )}
             >
-              {user ? "Review your profile" : "Browse as a guest"}
+              {user ? t("platform.reviewProfile") : t("platform.browseGuest")}
             </Link>
           </div>
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm">
             <span className="text-muted-foreground inline-flex items-center gap-2">
               <Check aria-hidden="true" className="text-success size-4" />
-              No account required to discover
+              {t("platform.noAccount")}
             </span>
             <span className="text-muted-foreground inline-flex items-center gap-2">
               <Check aria-hidden="true" className="text-success size-4" />
-              Built for two-player focus
+              {t("platform.twoPlayerFocus")}
             </span>
           </div>
         </div>
@@ -127,26 +134,24 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-primary font-mono text-xs font-semibold tracking-[0.16em] uppercase">
-              01 / Discover
+              {t("platform.discoverStep")}
             </p>
             <h2
               id="featured-games"
               className="font-display text-foreground mt-2 text-2xl font-semibold tracking-[0.03em] sm:text-3xl"
             >
-              Find your next co-op world
+              {t("platform.discoverTitle")}
             </h2>
             <p className="text-muted-foreground mt-3 max-w-2xl leading-7">
-              A small, intentional catalog while the platform comes online.
-              Every title has a clear status so you know what you can explore
-              now.
+              {t("platform.discoverHelp")}
             </p>
           </div>
           <Link
             href="/games"
             className="text-primary hover:text-primary-hover focus-visible:ring-ring inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
           >
-            View full catalog{" "}
-            <ArrowRight aria-hidden="true" className="size-4" />
+            {t("platform.fullCatalog")}{" "}
+            <ArrowRight aria-hidden="true" className="size-4 rtl:rotate-180" />
           </Link>
         </div>
         {featuredGames.length > 0 ? (
@@ -159,11 +164,11 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
           <EmptyState
             className="mt-8"
             icon={<Compass aria-hidden="true" />}
-            title="The catalog is warming up"
-            description="No games are available right now. Retry discovery or use the main navigation while the next brief is prepared."
+            title={t("platform.catalogWarming")}
+            description={t("platform.catalogWarmingHelp")}
             action={
               <Link href="/" className={buttonVariants({ variant: "outline" })}>
-                Retry discovery
+                {t("platform.retryDiscovery")}
               </Link>
             }
           />
@@ -174,36 +179,27 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
         <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div>
             <p className="text-primary font-mono text-xs font-semibold tracking-[0.16em] uppercase">
-              02 / The loop
+              {t("platform.loopStep")}
             </p>
             <h2
               id="how-it-works"
               className="font-display text-foreground mt-2 text-2xl font-semibold tracking-[0.03em] sm:text-3xl"
             >
-              A calm path to a good session
+              {t("platform.loopTitle")}
             </h2>
             <p className="text-muted-foreground mt-4 max-w-md leading-7">
-              Discover the worlds, invite a partner, and prepare your room.
-              Enter the match together and rely on server-confirmed results.
+              {t("platform.loopHelp")}
             </p>
           </div>
           <ol className="grid gap-4 sm:grid-cols-3">
             {[
-              [
-                "01",
-                "Choose a game",
-                "Explore the catalog and understand the experience before you commit.",
-              ],
+              ["01", t("platform.chooseGame"), t("platform.chooseGameHelp")],
               [
                 "02",
-                "Create a session",
-                "Create a public or private room and share the invite with your partner.",
+                t("platform.createSession"),
+                t("platform.createSessionHelp"),
               ],
-              [
-                "03",
-                "Team up and play",
-                "Enter the match together and rely on server-confirmed results.",
-              ],
+              ["03", t("platform.teamPlay"), t("platform.teamPlayHelp")],
             ].map(([number, title, copy]) => (
               <li
                 key={number}
@@ -230,17 +226,17 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-accent font-mono text-xs font-semibold tracking-[0.16em] uppercase">
-                  03 / Platform capabilities
+                  {t("platform.capabilitiesStep")}
                 </p>
                 <CardTitle
                   as="h2"
                   id="coming-soon"
                   className="mt-2 text-2xl sm:text-3xl"
                 >
-                  Your coordination layer
+                  {t("platform.capabilitiesTitle")}
                 </CardTitle>
               </div>
-              <Badge variant="outline">Rooms available · More to come</Badge>
+              <Badge variant="outline">{t("platform.roomsAvailable")}</Badge>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-3 xl:grid-cols-5">
@@ -260,7 +256,8 @@ export function HomePage({ featuredGames, user }: HomePageProps) {
                   {description}
                 </p>
                 <span className="text-muted-foreground mt-4 inline-flex items-center gap-2 font-mono text-[0.65rem] tracking-[0.12em] uppercase">
-                  <Gamepad2 aria-hidden="true" className="size-3.5" /> Planned
+                  <Gamepad2 aria-hidden="true" className="size-3.5" />{" "}
+                  {t("platform.planned")}
                 </span>
               </div>
             ))}

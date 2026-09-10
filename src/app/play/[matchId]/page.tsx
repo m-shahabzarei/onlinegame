@@ -4,18 +4,23 @@ import { getGameplayService } from "@/server/gameplay";
 import { GameShell } from "@/components/game/game-shell";
 import { SessionRequired } from "@/components/lobby/shared";
 import { buttonVariants } from "@/components/ui";
-import { getRequestLocale } from "@/i18n";
+import { getRequestLocale, createTranslator } from "@/i18n";
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "Training arena",
-  referrer: "no-referrer" as const,
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.trainingArena"),
+    referrer: "no-referrer" as const,
+    robots: { index: false, follow: false },
+  };
+}
 export default async function PlayPage({
   params,
 }: {
   params: Promise<{ matchId: string }>;
 }) {
+  const t = createTranslator(await getRequestLocale());
+
   const { matchId } = await params;
   const session = await getStrictCurrentSession();
   if (!session)
@@ -32,17 +37,17 @@ export default async function PlayPage({
         id="main-content"
         className="mx-auto grid max-w-xl gap-5 px-4 py-16"
       >
-        <h1 className="font-display text-2xl">Training session unavailable</h1>
+        <h1 className="font-display text-2xl">
+          {t("pages.trainingSessionUnavailable")}
+        </h1>
         <p className="text-muted-foreground">
-          This reservation has ended, is unavailable to your session, or the
-          gameplay service is not configured. Return to rooms to prepare another
-          match.
+          {t("pages.thisReservationHasEndedIsUnavailableToYourSession")}
         </p>
         <Link
           href="/games/nightfall-protocol/rooms"
           className={buttonVariants({ variant: "secondary" })}
         >
-          Return to rooms
+          {t("pages.returnToRooms")}
         </Link>
       </main>
     );

@@ -11,6 +11,9 @@ export const BINDINGS = {
   crouch: ["ControlLeft", "ControlRight", "KeyC"],
   reload: ["KeyR"],
   interact: ["KeyE"],
+  primary: ["Digit1"],
+  secondary: ["Digit2"],
+  shop: ["KeyB"],
 } as const;
 const gameplayKeys = new Set<string>(Object.values(BINDINGS).flat());
 export class GameInput {
@@ -19,6 +22,8 @@ export class GameInput {
   firing = false;
   locked = false;
   interacting = false;
+  suspended = false;
+  triggerSeq = 0;
   private keys = new Set<string>();
   private jump = false;
   private abort = new AbortController();
@@ -29,6 +34,9 @@ export class GameInput {
     readonly focus: (locked: boolean, error?: string) => void,
     readonly reload: () => void,
     readonly interact: (held: boolean) => void = () => {},
+    readonly shop: () => void = () => {},
+    readonly switchSlot: (slot: "primary" | "secondary") => void = () => {},
+    readonly triggerRelease: (seq: number) => void = () => {},
   ) {
     const options = { signal: this.abort.signal };
     document.addEventListener(
@@ -44,10 +52,7 @@ export class GameInput {
       "pointerlockerror",
       () => {
         this.clear();
-        focus(
-          false,
-          "Pointer lock was denied. Click Enter arena to retry, or check browser permissions.",
-        );
+        focus(false, "POINTER_LOCK_DENIED");
       },
       options,
     );
@@ -74,6 +79,18 @@ export class GameInput {
     document.addEventListener(
       "keydown",
       (event) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+        )
+          return;
+        if (event.code === "KeyB" && !event.repeat) {
+          event.preventDefault();
+          this.shop();
+          return;
+        }
         if (!this.active()) return;
         if (gameplayKeys.has(event.code)) event.preventDefault();
         if (event.code === "Escape") {
@@ -82,6 +99,10 @@ export class GameInput {
         }
         if (event.code === "Space" && !event.repeat) this.jump = true;
         if (event.code === "KeyR" && !event.repeat) this.reload();
+        if (event.code === "Digit1" && !event.repeat)
+          this.switchSlot("primary");
+        if (event.code === "Digit2" && !event.repeat)
+          this.switchSlot("secondary");
         if (event.code === "KeyE" && !event.repeat) {
           this.interacting = true;
           this.interact(true);
@@ -104,8 +125,9 @@ export class GameInput {
     document.addEventListener(
       "mousedown",
       (event) => {
-        if (this.active() && event.button === 0) {
+        if (this.active() && event.button === 0 && !this.firing) {
           event.preventDefault();
+          this.triggerSeq++;
           this.firing = true;
         }
       },
@@ -114,7 +136,7 @@ export class GameInput {
     document.addEventListener(
       "mouseup",
       (event) => {
-        if (event.button === 0) this.firing = false;
+        if (event.button === 0) this.releaseTrigger();
       },
       options,
     );
@@ -135,7 +157,7 @@ export class GameInput {
     );
   }
   active() {
-    return this.locked && this.canPlay() && !document.hidden;
+    return this.locked && !this.suspended && this.canPlay() && !document.hidden;
   }
   private held(binding: readonly string[]) {
     return binding.some((code) => this.keys.has(code));
@@ -159,7 +181,7 @@ export class GameInput {
     try {
       await this.canvas.requestPointerLock();
     } catch {
-      this.focus(false, "Pointer lock was denied. Click Enter arena to retry.");
+      this.focus(false, "POINTER_LOCK_DENIED");
     }
   }
   clear() {
@@ -168,12 +190,17 @@ export class GameInput {
       this.interact(false);
     }
     this.keys.clear();
-    this.firing = false;
+    this.releaseTrigger();
     this.jump = false;
   }
   release() {
     this.clear();
+    this.locked = false;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+  }
+  private releaseTrigger() {
+    if (this.firing) this.triggerRelease(this.triggerSeq);
+    this.firing = false;
   }
   dispose() {
     this.release();

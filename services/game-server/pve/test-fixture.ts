@@ -45,7 +45,7 @@ export function fixture(options: PvEOptions = {}) {
   });
   const ready = (slot: 0 | 1) =>
     match.command(reservation.players[slot].playerId, peers[slot]!, {
-      v: 2,
+      v: 3,
       type: "clientReady",
       mapId: "quarantine-yard",
       mapVersion: 2,

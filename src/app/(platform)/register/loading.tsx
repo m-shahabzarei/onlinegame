@@ -1,11 +1,14 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { Card, Skeleton } from "@/components/ui";
 
-export default function RegisterLoading() {
+export default async function RegisterLoading() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <section
       className="mx-auto w-full max-w-lg px-4 py-10 sm:px-6 sm:py-14"
       aria-busy="true"
-      aria-label="Loading account registration"
+      aria-label={t("pages.loadingAccountRegistration")}
     >
       <Card className="min-h-[34rem] p-6 sm:p-8" variant="elevated">
         <Skeleton className="h-4 w-32" radius="full" />

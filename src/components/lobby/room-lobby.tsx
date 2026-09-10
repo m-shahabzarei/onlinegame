@@ -1,4 +1,8 @@
 "use client";
+import { lobbyErrorMessage, lobbyStartBlocker } from "@/i18n/lobby-messages";
+import { useLocale, useTranslations } from "@/i18n/provider";
+import { formatDate } from "@/i18n/client";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,6 +36,7 @@ import {
   sendLobbyCommand,
 } from "./client";
 import { ConfirmAction, ConnectionBanner, InviteControls } from "./shared";
+import { catalogCopy } from "@/i18n/catalog";
 import { useLobbyConnection } from "./use-lobby-connection";
 
 type MemberAction = "ready" | "start" | "leave" | "close" | "kick" | "cancel";
@@ -42,12 +47,19 @@ export function RoomLobby({
   code: string;
   prepare?: boolean;
 }) {
+  const locale = useLocale();
+  const t = useTranslations();
+
   const router = useRouter();
   const [room, setRoom] = useState<LobbySnapshot | null>(null);
   const [error, setError] = useState("");
   const [accessError, setAccessError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<
+    | { code: "newHost"; name: string }
+    | { code: "youReady" | "youNotReady" | "roomUpdated" }
+    | null
+  >(null);
   const latest = useRef<LobbySnapshot | null>(null);
   const lastHeartbeat = useRef(0);
   const [failedCommand, setFailedCommand] = useState<LobbyCommand | null>(null);
@@ -58,7 +70,7 @@ export function RoomLobby({
     const next = reconcileSnapshot(latest.current, snapshot);
     const host = next.members.find((m) => m.role === "HOST");
     if (previousHost && host && previousHost.userId !== host.userId)
-      setFeedback(`${host.displayName} is now the host.`);
+      setFeedback({ code: "newHost", name: host.displayName });
     latest.current = next;
     setRoom(next);
     setAccessError(null);
@@ -120,13 +132,14 @@ export function RoomLobby({
       setFailedCommand(null);
       if (result.room) {
         accept(result.room);
-        setFeedback(
-          command.type === "ready"
-            ? command.ready
-              ? "You are Ready."
-              : "You are Not Ready."
-            : "Room updated.",
-        );
+        setFeedback({
+          code:
+            command.type === "ready"
+              ? command.ready
+                ? "youReady"
+                : "youNotReady"
+              : "roomUpdated",
+        });
         lastHeartbeat.current = 0;
         retry();
       } else {
@@ -178,9 +191,9 @@ export function RoomLobby({
           className={buttonVariants({ variant: "ghost", size: "sm" })}
           href={`/games/${room?.game.slug ?? "nightfall-protocol"}/rooms`}
         >
-          Back to room browser
+          {t("platform.backRooms")}
         </Link>
-        <Badge variant="primary">Session preparation</Badge>
+        <Badge variant="primary">{t("platform.preparation")}</Badge>
       </div>
       <ConnectionBanner
         state={connection}
@@ -193,7 +206,7 @@ export function RoomLobby({
       {error && (
         <Card padding="sm" className="space-y-3">
           <p role="alert" className="text-destructive">
-            {error}
+            {lobbyErrorMessage(locale, error)}
           </p>
           {failedCommand && (
             <Button
@@ -206,7 +219,7 @@ export function RoomLobby({
               }
               onClick={() => void execute(failedCommand)}
             >
-              Retry last action
+              {t("platform.retryAction")}
             </Button>
           )}
         </Card>
@@ -216,22 +229,25 @@ export function RoomLobby({
         aria-live="polite"
         className="text-success-foreground min-h-5 text-sm"
       >
-        {feedback}
+        {feedback &&
+          (feedback.code === "newHost"
+            ? t("platform.newHost", { name: feedback.name })
+            : t(`platform.${feedback.code}`))}
       </p>
       {!room ? (
         accessError ? (
           <Card padding="lg" className="mx-auto max-w-xl space-y-5">
             <h1 className="font-display text-2xl">
               {accessError === "ROOM_KICKED"
-                ? "You were removed"
+                ? t("platform.removedTitle")
                 : accessError === "UNAUTHENTICATED"
-                  ? "Restore your session"
-                  : "Join your partner"}
+                  ? t("platform.restoreSessionTitle")
+                  : t("platform.joinPartner")}
             </h1>
             <p className="text-muted-foreground">
               {accessError === "ROOM_KICKED"
-                ? "The host ended your membership. You can create a new room."
-                : "Your invite is kept here. Joining checks availability before revealing room details."}
+                ? t("platform.removedHelp")
+                : t("platform.inviteKept")}
             </p>
             <p className="font-mono text-2xl tracking-widest" dir="ltr">
               {code}
@@ -241,7 +257,7 @@ export function RoomLobby({
             ) && (
               <Button
                 loading={pending}
-                loadingText="Joining room"
+                loadingText={t("platform.joiningRoom")}
                 onClick={() =>
                   void execute({
                     type: "join",
@@ -250,7 +266,7 @@ export function RoomLobby({
                   })
                 }
               >
-                Join room
+                {t("platform.joinRoom")}
               </Button>
             )}
             {accessError === "UNAUTHENTICATED" && (
@@ -258,19 +274,19 @@ export function RoomLobby({
                 className={buttonVariants()}
                 href={`/login?next=${encodeURIComponent(`/rooms/${code}`)}`}
               >
-                Sign in again
+                {t("platform.signInAgain")}
               </Link>
             )}
             <Link
               className={buttonVariants({ variant: "outline" })}
               href="/games/nightfall-protocol/rooms"
             >
-              Browse rooms
+              {t("platform.browseRooms")}
             </Link>
           </Card>
         ) : (
           <div
-            aria-label="Loading lobby"
+            aria-label={t("platform.loadingLobby")}
             role="status"
             className="grid gap-6 md:grid-cols-2"
           >
@@ -284,42 +300,44 @@ export function RoomLobby({
             <div className="flex flex-wrap gap-2">
               <Badge variant={active ? "primary" : "warning"}>
                 {room.status === "STARTING"
-                  ? "Starting · Session reserved"
+                  ? t("platform.startingReserved")
                   : room.status === "WAITING"
-                    ? "Waiting for readiness"
+                    ? t("platform.waitingReadiness")
                     : room.status === "EXPIRED"
-                      ? "Room expired"
-                      : "Room closed"}
+                      ? t("platform.roomExpired")
+                      : t("platform.roomClosed")}
               </Badge>
               <Badge variant="outline">
                 <LockKeyhole aria-hidden="true" className="size-3.5" />
-                {room.visibility === "PRIVATE" ? "Private room" : "Public room"}
+                {room.visibility === "PRIVATE"
+                  ? t("platform.privateRoom")
+                  : t("platform.publicRoom")}
               </Badge>
             </div>
             <h1 className="font-display text-3xl sm:text-4xl">
               {prepare && room.status === "STARTING"
-                ? "Your room is prepared."
-                : room.game.name}
+                ? t("platform.roomPrepared")
+                : catalogCopy(locale, room.game.slug).name}
             </h1>
             <p className="text-muted-foreground max-w-2xl leading-7">
-              {room.game.description}
+              {catalogCopy(locale, room.game.slug).description}
             </p>
           </header>
           {!active ? (
             <Card padding="lg" className="space-y-4">
               <h2 className="font-display text-xl">
                 {room.status === "EXPIRED"
-                  ? "This invite has expired."
-                  : "This room has closed."}
+                  ? t("platform.inviteExpired")
+                  : t("platform.roomHasClosed")}
               </h2>
               <p className="text-muted-foreground">
-                Create a new room to bring your partner back together.
+                {t("platform.newRoomHelp")}
               </p>
               <Link
                 className={buttonVariants()}
                 href={`/games/${room.game.slug}/rooms`}
               >
-                Find or create a room
+                {t("platform.findRoom")}
               </Link>
             </Card>
           ) : (
@@ -327,11 +345,14 @@ export function RoomLobby({
               <section className="space-y-4" aria-labelledby="squad-title">
                 <div className="flex items-center justify-between gap-3">
                   <h2 id="squad-title" className="font-display text-xl">
-                    Your squad
+                    {t("platform.squad")}
                   </h2>
                   <span className="text-muted-foreground flex items-center gap-2 font-mono text-sm">
                     <UsersRound aria-hidden="true" className="size-4" />
-                    {room.members.length}/{room.maxPlayers}
+                    {t("platform.capacity", {
+                      count: room.members.length,
+                      maximum: room.maxPlayers,
+                    })}
                   </span>
                 </div>
                 {Array.from({ length: room.maxPlayers }, (_, index) => {
@@ -346,7 +367,9 @@ export function RoomLobby({
                         <Avatar className="size-14 shrink-0">
                           <AvatarImage
                             src={member.avatarUrl ?? undefined}
-                            alt={`${member.displayName} avatar`}
+                            alt={t("platform.avatar", {
+                              name: member.displayName,
+                            })}
                           />
                           <AvatarFallback>
                             {member.displayName.slice(0, 2)}
@@ -355,7 +378,9 @@ export function RoomLobby({
                         <div className="min-w-0 flex-1 space-y-2">
                           <h3 className="text-lg font-semibold break-words">
                             {member.displayName}
-                            {member.userId === room.selfId ? " (you)" : ""}
+                            {member.userId === room.selfId
+                              ? t("platform.youSuffix")
+                              : ""}
                           </h3>
                           <div className="flex flex-wrap gap-2">
                             {member.role === "HOST" && (
@@ -364,10 +389,12 @@ export function RoomLobby({
                                   aria-hidden="true"
                                   className="size-3.5"
                                 />
-                                Host
+                                {t("platform.host")}
                               </Badge>
                             )}
-                            {member.isGuest && <Badge>Guest</Badge>}
+                            {member.isGuest && (
+                              <Badge>{t("platform.guest")}</Badge>
+                            )}
                             <Badge
                               variant={member.ready ? "success" : "neutral"}
                             >
@@ -377,7 +404,9 @@ export function RoomLobby({
                                   className="size-3.5"
                                 />
                               )}
-                              {member.ready ? "Ready" : "Not Ready"}
+                              {member.ready
+                                ? t("platform.ready")
+                                : t("platform.notReady")}
                             </Badge>
                           </div>
                         </div>
@@ -385,15 +414,17 @@ export function RoomLobby({
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-muted-foreground text-sm">
                           {member.connection === "CONNECTED"
-                            ? "Online · In lobby"
+                            ? t("platform.onlineLobby")
                             : member.connection === "RECONNECTING"
-                              ? "Reconnecting · Slot held during grace period"
-                              : "Disconnected"}
+                              ? t("platform.reconnectSlot")
+                              : t("platform.disconnected")}
                         </p>
                         {host && member.userId !== room.selfId && (
                           <ConfirmAction
-                            label="Remove player"
-                            description={`Remove ${member.displayName} from this room? Any reserved session will be cancelled.`}
+                            label={t("platform.removePlayer")}
+                            description={t("platform.removePlayerConfirm", {
+                              name: member.displayName,
+                            })}
                             disabled={disabled}
                             onConfirm={() => action("kick", member.userId)}
                           />
@@ -414,13 +445,13 @@ export function RoomLobby({
                       <div>
                         <h3 className="font-semibold">
                           {room.mode === "solo"
-                            ? "Solo arena"
-                            : "A place for your partner"}
+                            ? t("platform.soloArena")
+                            : t("platform.partnerPlace")}
                         </h3>
                         <p className="text-muted-foreground mt-1 text-sm">
                           {room.mode === "solo"
-                            ? "You are ready to play alone."
-                            : "Copy the invite and share it with your second player."}
+                            ? t("platform.soloReady")
+                            : t("platform.sharePartner")}
                         </p>
                       </div>
                     </Card>
@@ -433,21 +464,20 @@ export function RoomLobby({
                       className="text-success size-8"
                     />
                     <h2 className="font-display text-xl">
-                      Session successfully reserved
+                      {t("platform.sessionReserved")}
                     </h2>
                     <p className="text-muted-foreground leading-7">
-                      Your training session is reserved. Connecting you to the
-                      shared arena.
+                      {t("platform.connectingArena")}
                     </p>
                     <p className="text-muted-foreground text-sm">
                       {host
-                        ? "Cancel preparation to return everyone to the lobby."
-                        : "The host can cancel preparation and return everyone to the lobby. You can also leave the room."}
+                        ? t("platform.hostCancelHelp")
+                        : t("platform.memberCancelHelp")}
                     </p>
                     {host && (
                       <ConfirmAction
-                        label="Cancel preparation"
-                        description="Cancel this reservation and return both players to the lobby as Not Ready?"
+                        label={t("platform.cancelPreparation")}
+                        description={t("platform.cancelPreparationConfirm")}
                         disabled={disabled}
                         onConfirm={() => action("cancel")}
                       />
@@ -458,7 +488,9 @@ export function RoomLobby({
               <aside className="space-y-5">
                 <Card padding="md" className="space-y-5">
                   <div>
-                    <p className="text-muted-foreground text-sm">Room code</p>
+                    <p className="text-muted-foreground text-sm">
+                      {t("platform.roomCode")}
+                    </p>
                     <p
                       dir="ltr"
                       className="text-primary mt-2 font-mono text-3xl font-semibold tracking-[0.16em]"
@@ -468,19 +500,21 @@ export function RoomLobby({
                   </div>
                   <InviteControls code={room.code} />
                   <p className="text-muted-foreground text-xs">
-                    Invite expires at{" "}
-                    {new Date(room.expiresAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
+                    {t("platform.inviteExpires", {
+                      time: formatDate(locale, room.expiresAt, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
                     })}
-                    .
                   </p>
                 </Card>
                 <Card padding="md" className="space-y-4">
                   {room.status === "WAITING" && (
                     <>
                       <h2 className="font-display text-lg">
-                        {host ? "Prepare your session" : "Ready when you are"}
+                        {host
+                          ? t("platform.prepareSession")
+                          : t("platform.readyWhenYouAre")}
                       </h2>
                       <Button
                         className="w-full"
@@ -490,7 +524,9 @@ export function RoomLobby({
                         aria-pressed={self?.ready ?? false}
                         onClick={() => void action("ready")}
                       >
-                        {self?.ready ? "Set Not Ready" : "I’m Ready"}
+                        {self?.ready
+                          ? t("platform.setNotReady")
+                          : t("platform.imReady")}
                       </Button>
                       {host && (
                         <Button
@@ -499,39 +535,39 @@ export function RoomLobby({
                           aria-describedby="start-reason"
                           onClick={() => void action("start")}
                         >
-                          Start Game
+                          {t("platform.startGame")}
                         </Button>
                       )}
                       <p
                         id="start-reason"
                         className="text-muted-foreground text-sm leading-6"
                       >
-                        {room.startBlocker ??
+                        {lobbyStartBlocker(locale, room) ??
                           (host
                             ? room.mode === "solo"
-                              ? "You are ready. Start your solo session."
-                              : "Both players are ready. You can reserve the session."
+                              ? t("platform.soloStartHelp")
+                              : t("platform.coopStartHelp")
                             : room.mode === "solo"
-                              ? "Set Ready, then the host can start."
-                              : "Both players are ready. Waiting for the host to start.")}
+                              ? t("platform.setReadyHelp")
+                              : t("platform.waitHostHelp"))}
                       </p>
                     </>
                   )}
                   <div className="border-border flex flex-wrap gap-3 border-t pt-4">
                     <ConfirmAction
-                      label="Leave room"
+                      label={t("platform.leaveRoom")}
                       description={
                         host
-                          ? "Leave and transfer hosting to the remaining player? Any preparation will be cancelled."
-                          : "Leave this room? Any preparation will be cancelled."
+                          ? t("platform.hostLeaveConfirm")
+                          : t("platform.leaveConfirm")
                       }
                       disabled={disabled}
                       onConfirm={() => action("leave")}
                     />
                     {host && (
                       <ConfirmAction
-                        label="Close room"
-                        description="Close this room for everyone? This invite will no longer accept players."
+                        label={t("platform.closeRoom")}
+                        description={t("platform.closeRoomConfirm")}
                         disabled={disabled}
                         onConfirm={() => action("close")}
                       />
@@ -543,8 +579,8 @@ export function RoomLobby({
           )}
           <p className="text-muted-foreground text-sm">
             {room.mode === "solo"
-              ? "One player. One shared training arena."
-              : "Two players. One shared training arena. Ready up to enter."}
+              ? t("platform.soloFooter")
+              : t("platform.coopFooter")}
           </p>
         </>
       )}

@@ -1,9 +1,11 @@
 "use client";
+import { useLocale, useTranslations } from "@/i18n/provider";
 
 import { ImageOff, ScanLine } from "lucide-react";
 import * as React from "react";
 
-import { catalogStatusLabel, type CatalogGame } from "@/domain/catalog";
+import { type CatalogGame } from "@/domain/catalog";
+import { catalogCopy, localizedCatalogStatus } from "@/i18n/catalog";
 import { cn } from "@/lib/cn";
 
 export interface GameArtProps {
@@ -19,9 +21,16 @@ export interface GameArtProps {
  */
 export function GameArt({
   className,
-  game,
+  game: sourceGame,
   priority = false,
 }: GameArtProps): React.JSX.Element {
+  const locale = useLocale();
+  const t = useTranslations();
+  const game = {
+    ...sourceGame,
+    name: catalogCopy(locale, sourceGame.slug).name,
+  };
+
   const [failedSource, setFailedSource] = React.useState<string | null>(null);
 
   // Comparing the failed source keeps the fallback reset-free when a parent
@@ -37,7 +46,7 @@ export function GameArt({
         className,
       )}
       role="img"
-      aria-label={`${game.name} cover art`}
+      aria-label={t("platform.coverArt", { name: game.name })}
     >
       <div
         aria-hidden="true"
@@ -72,7 +81,7 @@ export function GameArt({
       <div className="from-background/90 via-background/35 absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t to-transparent p-4 pt-12">
         <div className="min-w-0">
           <p className="text-primary font-mono text-[0.65rem] font-semibold tracking-[0.2em] uppercase">
-            {game.slug.replaceAll("-", " ")}
+            {game.name}
           </p>
           <p className="font-display text-foreground mt-1 truncate text-sm font-semibold tracking-[0.05em]">
             {game.name}
@@ -81,7 +90,7 @@ export function GameArt({
         {imageFailed ? (
           <span className="border-warning/40 bg-warning-subtle/80 text-warning-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[0.65rem] font-medium">
             <ImageOff aria-hidden="true" className="size-3.5" />
-            Art unavailable
+            {t("platform.artUnavailable")}
           </span>
         ) : (
           <ScanLine
@@ -92,7 +101,7 @@ export function GameArt({
       </div>
 
       <span className="border-border/80 bg-background/75 text-foreground/85 absolute start-3 top-3 rounded-full border px-2 py-1 font-mono text-[0.65rem] font-semibold tracking-[0.12em] uppercase backdrop-blur-sm">
-        {catalogStatusLabel(game.status)}
+        {localizedCatalogStatus(locale, game.status)}
       </span>
     </div>
   );

@@ -1,11 +1,14 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { Card, Skeleton } from "@/components/ui";
 
-export default function ProfileLoading() {
+export default async function ProfileLoading() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <section
       className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.75fr)] lg:px-8"
       aria-busy="true"
-      aria-label="Loading profile"
+      aria-label={t("pages.loadingProfile")}
     >
       <Card className="min-h-[30rem] p-6 sm:p-8" variant="elevated">
         <Skeleton className="h-4 w-32" radius="full" />

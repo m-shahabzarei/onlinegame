@@ -22,6 +22,7 @@
 ### Task 1: Shared Phase 6 content and state model
 
 **Files:**
+
 - Create: `src/game/shared/phase6.ts`
 - Modify: `src/game/shared/protocol.ts`, `src/game/shared/pve.ts`, `src/game/shared/lifecycle.ts`
 - Test: `src/game/shared/phase6.test.ts`
@@ -35,6 +36,7 @@
 ### Task 2: Authoritative Phase 6 match services
 
 **Files:**
+
 - Create: `services/game-server/phase6.ts`
 - Modify: `services/game-server/match.ts`, `services/game-server/pve/simulation.ts`, `services/game-server/pve/waves.ts`, `services/game-server/pve/damage.ts`
 - Test: `services/game-server/phase6.test.ts`, `services/game-server/match.test.ts`
@@ -49,6 +51,7 @@
 ### Task 3: Client protocol/runtime and HUD
 
 **Files:**
+
 - Modify: `src/game/client/runtime.ts`, `src/game/client/pve-hud.ts`, `src/game/client/network.ts`, `src/components/game/game-shell.tsx`, `src/components/game/game.module.css`
 - Create: `src/components/game/phase6-shop.tsx`
 - Test: `src/game/client/runtime.test.ts`, `src/components/game/phase6-shop.test.tsx`
@@ -61,6 +64,7 @@
 ### Task 4: Documentation and verification
 
 **Files:**
+
 - Create: `docs/phase-6-architecture.md`, `docs/phase-6-development.md`, `docs/phase-6-verification.md`
 - Modify: `README.md`
 

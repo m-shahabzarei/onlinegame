@@ -1,10 +1,12 @@
 "use client";
+import { actionMessage, localizedFieldErrors } from "@/i18n/action-messages";
+import { useLocale } from "@/i18n/provider";
+import { createTranslator } from "@/i18n/client";
 
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { messages, type Locale } from "@/i18n/messages";
-import { clientTranslate } from "@/i18n/client";
+import { type Locale } from "@/i18n/messages";
 
 import { ArrowRight, Check, UserRound } from "lucide-react";
 
@@ -75,8 +77,12 @@ export function AuthForm({
   action,
   mode,
   nextPath,
-  locale = "en",
+  locale: explicitLocale,
 }: AuthFormProps) {
+  const contextLocale = useLocale();
+  const locale = explicitLocale ?? contextLocale;
+  const t = createTranslator(locale);
+
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState({
@@ -92,10 +98,8 @@ export function AuthForm({
     action,
     initialFormActionState,
   );
-  const fieldErrors = state.error?.fieldErrors;
+  const fieldErrors = localizedFieldErrors(locale, state.error?.fieldErrors);
   const isRegister = mode === "register";
-  const t = (key: `auth.${keyof typeof messages.en.auth & string}`) =>
-    clientTranslate(locale, key);
 
   useEffect(() => {
     const destination = state.ok ? state.data?.redirectTo : undefined;
@@ -143,6 +147,7 @@ export function AuthForm({
               disabled={pending}
               label={t("auth.username")}
               name="username"
+              dir="ltr"
               value={values.username}
               onChange={(event) =>
                 setValues((current) => ({
@@ -165,6 +170,7 @@ export function AuthForm({
             disabled={pending}
             label={isRegister ? t("auth.email") : t("auth.emailOrUsername")}
             name={isRegister ? "email" : "identifier"}
+            dir="ltr"
             type={isRegister ? "email" : "text"}
             inputMode={isRegister ? "email" : "text"}
             value={isRegister ? values.email : values.identifier}
@@ -283,7 +289,7 @@ export function AuthForm({
               className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border px-3 py-2 text-sm"
               role="alert"
             >
-              {state.error.message}
+              {actionMessage(locale, state.error.message, state.error.code)}
             </p>
           ) : null}
           {state.ok && state.message ? (
@@ -292,7 +298,7 @@ export function AuthForm({
               role="status"
               aria-live="polite"
             >
-              {state.message}
+              {actionMessage(locale, state.message)}
             </p>
           ) : null}
 
@@ -335,7 +341,15 @@ export function AuthForm({
 }
 
 /** Explicit guest continuation with clear limits before the temporary session starts. */
-export function GuestForm({ action, nextPath }: GuestFormProps) {
+export function GuestForm({
+  action,
+  nextPath,
+  locale: explicitLocale,
+}: GuestFormProps) {
+  const contextLocale = useLocale();
+  const locale = explicitLocale ?? contextLocale;
+  const t = createTranslator(locale);
+
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     action,
@@ -351,45 +365,42 @@ export function GuestForm({ action, nextPath }: GuestFormProps) {
       <CardHeader className="space-y-3">
         <Badge variant="warning" className="gap-2">
           <UserRound aria-hidden="true" className="size-3.5" />
-          Temporary access
+          {t("platform.temporaryAccess")}
         </Badge>
         <CardTitle as="h1" className="text-2xl sm:text-3xl">
-          Explore as a guest
+          {t("platform.exploreGuest")}
         </CardTitle>
-        <CardDescription>
-          Start browsing immediately with a temporary identity. A permanent
-          account creates a separate profile, so temporary edits will not carry
-          over.
-        </CardDescription>
+        <CardDescription>{t("platform.guestIntro")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid gap-5">
           {nextPath ? (
             <input type="hidden" name="next" value={nextPath} />
           ) : null}
-          <ul className="grid gap-3" aria-label="Guest mode limitations">
+          <ul
+            className="grid gap-3"
+            aria-label={t("platform.guestLimitations")}
+          >
             <li className="text-muted-foreground flex items-start gap-3 text-sm leading-6">
               <Check
                 aria-hidden="true"
                 className="text-success mt-1 size-4 shrink-0"
               />
-              Browse the home page and game catalog.
+              {t("platform.guestBrowse")}
             </li>
             <li className="text-muted-foreground flex items-start gap-3 text-sm leading-6">
               <Check
                 aria-hidden="true"
                 className="text-success mt-1 size-4 shrink-0"
               />
-              Review planned game details and platform updates.
+              {t("platform.guestReview")}
             </li>
             <li className="text-muted-foreground flex items-start gap-3 text-sm leading-6">
               <ArrowRight
                 aria-hidden="true"
-                className="text-warning mt-1 size-4 shrink-0"
+                className="text-warning mt-1 size-4 shrink-0 rtl:rotate-180"
               />
-              Create or join multiplayer rooms with this guest identity. Keep
-              this browser session to return to your lobby. Gameplay arrives in
-              Phase 4.
+              {t("platform.guestRooms")}
             </li>
           </ul>
           {state.error?.message ? (
@@ -397,26 +408,26 @@ export function GuestForm({ action, nextPath }: GuestFormProps) {
               className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border px-3 py-2 text-sm"
               role="alert"
             >
-              {state.error.message}
+              {actionMessage(locale, state.error.message, state.error.code)}
             </p>
           ) : null}
           <Button
             className="w-full"
             type="submit"
             loading={pending}
-            loadingText="Starting guest session..."
+            loadingText={t("platform.startingGuest")}
             role="button"
-            aria-label="Continue as a guest"
+            aria-label={t("platform.continueAsGuest")}
           >
-            Continue as a guest
+            {t("platform.continueAsGuest")}
           </Button>
           <p className="text-muted-foreground text-center text-sm">
-            Already have an account?{" "}
+            {t("platform.haveAccount")}{" "}
             <Link
               className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-md px-1 font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
               href="/login"
             >
-              Sign in instead
+              {t("platform.signInInstead")}
             </Link>
           </p>
         </form>

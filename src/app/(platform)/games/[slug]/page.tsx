@@ -1,4 +1,11 @@
 import type { Metadata } from "next";
+import type { Locale } from "@/i18n/messages";
+import {
+  localizeCatalogGame,
+  localizedCatalogStatus,
+  localizedCatalogDifficulty,
+} from "@/i18n/catalog";
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,11 +16,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import {
-  catalogDifficultyLabel,
-  catalogStatusLabel,
-  type CatalogGame,
-} from "@/domain/catalog";
+import { type CatalogGame } from "@/domain/catalog";
 import {
   Badge,
   buttonVariants,
@@ -35,13 +38,18 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
 }: GameDetailsPageProps): Promise<Metadata> {
+  const t = createTranslator(await getRequestLocale());
+
   const { slug } = await params;
-  const game = await getCatalogGame(slug);
+  const rawGame = await getCatalogGame(slug);
+  const game = rawGame
+    ? localizeCatalogGame(await getRequestLocale(), rawGame)
+    : rawGame;
 
   if (!game) {
     return {
-      title: "Game not found",
-      description: "The requested TwoPlayer game brief could not be found.",
+      title: t("pages.gameNotFound"),
+      description: t("pages.theRequestedTwoPlayerGameBriefCouldNotBeFound"),
     };
   }
 
@@ -64,18 +72,27 @@ function statusVariant(
   }
 }
 
-function actionCopy(status: CatalogGame["status"]): string {
+function actionCopy(locale: Locale, status: CatalogGame["status"]): string {
+  const t = createTranslator(locale);
   switch (status) {
     case "AVAILABLE":
-      return "Room preparation is available for Nightfall Protocol";
+      return t("pages.roomPreparationIsAvailableForNightfallProtocol");
     case "COMING_SOON":
-      return "This game is being prepared for a future phase";
+      return t("pages.thisGameIsBeingPreparedForAFuturePhase");
     case "MAINTENANCE":
-      return "This game brief is temporarily under maintenance";
+      return t("pages.thisGameBriefIsTemporarilyUnderMaintenance");
   }
 }
 
-function GameDetailsContent({ game }: { game: CatalogGame }) {
+function GameDetailsContent({
+  game,
+  locale,
+}: {
+  game: CatalogGame;
+  locale: Locale;
+}) {
+  const t = createTranslator(locale);
+
   return (
     <>
       <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
@@ -84,10 +101,10 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
           href="/games"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Back to games
+          {t("pages.backToGames")}
         </Link>
         <span className="text-muted-foreground font-mono text-xs tracking-[0.12em] uppercase">
-          Game brief · No live session data
+          {t("pages.gameBriefNoLiveSessionData")}
         </span>
       </div>
 
@@ -106,7 +123,7 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={statusVariant(game.status)}>
-              {catalogStatusLabel(game.status)}
+              {localizedCatalogStatus(locale, game.status)}
             </Badge>
             {game.tags.map((tag) => (
               <Badge key={tag} variant="outline" size="sm">
@@ -121,28 +138,28 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
             <div className="border-border/80 space-y-1 border-e pe-2">
               <UsersRound aria-hidden="true" className="text-primary size-4" />
               <p className="text-muted-foreground font-mono text-xs uppercase">
-                Players
+                {t("pages.players")}
               </p>
               <p className="text-foreground text-sm font-semibold">
-                Up to {game.maxPlayers}
+                {t("pages.playerCapacity", { count: game.maxPlayers })}
               </p>
             </div>
             <div className="border-border/80 space-y-1 border-e pe-2">
               <Clock3 aria-hidden="true" className="text-primary size-4" />
               <p className="text-muted-foreground font-mono text-xs uppercase">
-                Session
+                {t("pages.session")}
               </p>
               <p className="text-foreground text-sm font-semibold">
-                ~{game.durationMinutes} min
+                {t("pages.minutes", { count: game.durationMinutes })}
               </p>
             </div>
             <div className="space-y-1">
               <ShieldAlert aria-hidden="true" className="text-primary size-4" />
               <p className="text-muted-foreground font-mono text-xs uppercase">
-                Difficulty
+                {t("pages.difficulty")}
               </p>
               <p className="text-foreground text-sm font-semibold">
-                {catalogDifficultyLabel(game.difficulty)}
+                {localizedCatalogDifficulty(locale, game.difficulty)}
               </p>
             </div>
           </div>
@@ -154,12 +171,12 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
               </span>
               <div>
                 <h2 className="font-display text-foreground text-sm font-semibold tracking-[0.03em]">
-                  Platform availability
+                  {t("pages.platformAvailability")}
                 </h2>
                 <p className="text-muted-foreground mt-1 text-sm leading-6">
                   {game.slug === "nightfall-protocol"
-                    ? "Create a public or private room, invite a partner, and prepare a two-player session. Actual gameplay arrives in Phase 4."
-                    : `${actionCopy(game.status)}. Gameplay is not available yet.`}
+                    ? t("pages.createAPublicOrPrivateRoomInviteAPartner")
+                    : `${actionCopy(locale, game.status)}. ${t("pages.comingSoon")}`}
                 </p>
               </div>
             </div>
@@ -173,14 +190,14 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
                 }
               >
                 {game.slug === "nightfall-protocol"
-                  ? "Browse rooms"
-                  : "Review preparation brief"}
+                  ? t("pages.browseRooms")
+                  : t("pages.reviewPreparationBrief")}
               </Link>
               <Link
                 className={buttonVariants({ variant: "outline", size: "sm" })}
                 href="/games"
               >
-                Browse catalog
+                {t("pages.browseCatalog")}
               </Link>
             </div>
           </Card>
@@ -194,10 +211,10 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
         <Card variant="default" padding="md">
           <CardHeader className="p-0 pb-5">
             <p className="text-primary font-mono text-xs font-semibold tracking-[0.18em] uppercase">
-              Experience overview
+              {t("pages.experienceOverview")}
             </p>
             <CardTitle as="h2" className="mt-2 text-xl">
-              What to expect
+              {t("pages.whatToExpect")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -210,10 +227,10 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
         <Card variant="elevated" padding="md">
           <CardHeader className="p-0 pb-5">
             <p className="text-primary font-mono text-xs font-semibold tracking-[0.18em] uppercase">
-              Planned systems
+              {t("pages.plannedSystems")}
             </p>
             <CardTitle as="h2" className="mt-2 text-xl">
-              Feature direction
+              {t("pages.featureDirection")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -235,7 +252,7 @@ function GameDetailsContent({ game }: { game: CatalogGame }) {
       </section>
 
       <p className="text-muted-foreground mt-10 text-center font-mono text-xs tracking-[0.12em] uppercase">
-        Prepare your team in the room lobby · Gameplay arrives in Phase 4.
+        {t("pages.prepareYourTeamInTheRoomLobbyGameplayArrives")}
       </p>
     </>
   );
@@ -254,7 +271,10 @@ export default async function GameDetailsPage({
   return (
     <div className="min-h-dvh px-4 py-10 sm:px-6 lg:py-14">
       <div className="mx-auto w-full max-w-7xl">
-        <GameDetailsContent game={game} />
+        <GameDetailsContent
+          game={localizeCatalogGame(await getRequestLocale(), game)}
+          locale={await getRequestLocale()}
+        />
       </div>
     </div>
   );

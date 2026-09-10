@@ -3,9 +3,13 @@ import { getCatalogGame } from "@/server/catalog";
 import { getCurrentSession } from "@/server/dal/session";
 import { RoomBrowser } from "@/components/lobby/room-browser";
 import { SessionRequired } from "@/components/lobby/shared";
-import { getRequestLocale } from "@/i18n";
+import { localizeCatalogGame } from "@/i18n/catalog";
+import { getRequestLocale, createTranslator } from "@/i18n";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Room browser" };
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return { title: t("pages.roomBrowser") };
+}
 export default async function GameRoomsPage({
   params,
 }: {
@@ -24,7 +28,7 @@ export default async function GameRoomsPage({
   return (
     <RoomBrowser
       slug={slug}
-      name={game.name}
+      name={localizeCatalogGame(await getRequestLocale(), game).name}
       locale={await getRequestLocale()}
     />
   );

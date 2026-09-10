@@ -1,3 +1,6 @@
+"use client";
+import { useTranslations } from "@/i18n/provider";
+
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
@@ -23,13 +26,6 @@ const statusDotVariants = cva("shrink-0 rounded-full ring-2 ring-background", {
   },
 });
 
-const defaultLabels = {
-  away: "Away",
-  busy: "Busy",
-  offline: "Offline",
-  online: "Online",
-} as const;
-
 export interface StatusIndicatorProps
   extends
     React.HTMLAttributes<HTMLSpanElement>,
@@ -46,6 +42,14 @@ export const StatusIndicator = React.forwardRef<
     { className, label, showLabel = true, size, status = "offline", ...props },
     ref,
   ) => {
+    const t = useTranslations();
+
+    const defaultLabels = {
+      away: t("platform.away"),
+      busy: t("platform.busy"),
+      offline: t("platform.offline"),
+      online: t("platform.online"),
+    } as const;
     const statusLabel = label ?? defaultLabels[status ?? "offline"];
 
     return (

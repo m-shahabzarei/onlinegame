@@ -1,4 +1,7 @@
 "use client";
+import { useLocale, useTranslations } from "@/i18n/provider";
+import { createTranslator } from "@/i18n/client";
+
 import Link from "next/link";
 import { Copy, Link2, Radio, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -18,13 +21,6 @@ import {
   Input,
 } from "@/components/ui";
 
-const labels: Record<ConnectionState, string> = {
-  CONNECTING: "Connecting",
-  CONNECTED: "Connected",
-  RECONNECTING: "Reconnecting",
-  DISCONNECTED: "Disconnected",
-  FAILED: "Connection failed",
-};
 export function ConnectionBanner({
   state,
   retry,
@@ -32,6 +28,16 @@ export function ConnectionBanner({
   state: ConnectionState;
   retry(): void;
 }) {
+  const t = useTranslations();
+
+  const labels: Record<ConnectionState, string> = {
+    CONNECTING: t("platform.connecting"),
+    CONNECTED: t("platform.connected"),
+    RECONNECTING: t("platform.reconnecting"),
+    DISCONNECTED: t("platform.disconnected"),
+    FAILED: t("platform.connectionFailed"),
+  };
+
   return (
     <div
       className="border-border bg-surface/90 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3"
@@ -44,42 +50,42 @@ export function ConnectionBanner({
         {state !== "CONNECTED" && (
           <span className="text-muted-foreground">
             {" "}
-            · Actions resume after recovery.
+            {t("platform.actionsResume")}
           </span>
         )}
       </span>
       {state !== "CONNECTED" && (
         <Button size="sm" variant="outline" onClick={retry}>
           <RotateCcw aria-hidden="true" className="size-4" />
-          Retry connection
+          {t("platform.retryConnection")}
         </Button>
       )}
     </div>
   );
 }
 export function SessionRequired({ next }: { next: string }) {
+  const locale = useLocale();
+  const t = createTranslator(locale);
+
   return (
     <Card padding="lg" className="mx-auto max-w-xl space-y-5">
-      <h1 className="font-display text-2xl">Choose your player identity</h1>
-      <p className="text-muted-foreground">
-        Sign in or use a guest session to create and join rooms. Your invite
-        will be kept.
-      </p>
+      <h1 className="font-display text-2xl">{t("platform.chooseIdentity")}</h1>
+      <p className="text-muted-foreground">{t("platform.identityHelp")}</p>
       <div className="flex flex-wrap gap-3">
         <Link
           className={buttonVariants()}
           href={`/login?next=${encodeURIComponent(next)}`}
         >
-          Sign in
+          {t("platform.signIn")}
         </Link>
         <Link
           className={buttonVariants({ variant: "outline" })}
           href={`/continue-as-guest?next=${encodeURIComponent(next)}`}
         >
-          Continue as guest
+          {t("platform.continueGuest")}
         </Link>
         <Link className={buttonVariants({ variant: "ghost" })} href="/games">
-          Back to games
+          {t("platform.backGames")}
         </Link>
       </div>
     </Card>
@@ -96,6 +102,9 @@ export function ConfirmAction({
   disabled?: boolean;
   onConfirm(): Promise<void>;
 }) {
+  const locale = useLocale();
+  const t = createTranslator(locale);
+
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   return (
@@ -111,13 +120,13 @@ export function ConfirmAction({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{label}?</DialogTitle>
+          <DialogTitle>{t("platform.confirmTitle", { label })}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={pending} autoFocus>
-              Keep room
+              {t("platform.keepRoom")}
             </Button>
           </DialogClose>
           <Button
@@ -141,22 +150,25 @@ export function ConfirmAction({
   );
 }
 export function InviteControls({ code }: { code: string }) {
-  const [feedback, setFeedback] = useState("");
+  const locale = useLocale();
+  const t = createTranslator(locale);
+
+  const [feedback, setFeedback] = useState<
+    "inviteCopied" | "codeCopied" | "copyUnavailable" | null
+  >(null);
   const field = useRef<HTMLInputElement>(null);
   async function copy(link: boolean) {
     const value = link ? `${window.location.origin}/rooms/${code}` : code;
     try {
       await navigator.clipboard.writeText(value);
-      setFeedback(link ? "Invite link copied." : "Room code copied.");
+      setFeedback(link ? "inviteCopied" : "codeCopied");
     } catch {
       if (field.current) {
         field.current.value = value;
         field.current.focus();
         field.current.select();
       }
-      setFeedback(
-        "Copy is unavailable. The invite is selected below; use your device’s Copy action.",
-      );
+      setFeedback("copyUnavailable");
     }
   }
   return (
@@ -164,16 +176,17 @@ export function InviteControls({ code }: { code: string }) {
       <div className="flex flex-wrap gap-3">
         <Button variant="outline" size="sm" onClick={() => void copy(false)}>
           <Copy aria-hidden="true" className="size-4" />
-          Copy code
+          {t("platform.copyCode")}
         </Button>
         <Button variant="outline" size="sm" onClick={() => void copy(true)}>
           <Link2 aria-hidden="true" className="size-4" />
-          Copy invite link
+          {t("platform.copyInvite")}
         </Button>
       </div>
       <Input
         ref={field}
-        label="Shareable invite"
+        label={t("platform.shareableInvite")}
+        dir="ltr"
         readOnly
         defaultValue={`/rooms/${code}`}
         className="font-mono text-sm"
@@ -183,7 +196,7 @@ export function InviteControls({ code }: { code: string }) {
         aria-live="polite"
         className="text-muted-foreground min-h-5 text-sm"
       >
-        {feedback}
+        {feedback && t(`platform.${feedback}`)}
       </p>
     </div>
   );

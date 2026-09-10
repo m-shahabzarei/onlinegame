@@ -1,46 +1,48 @@
 "use client";
+import { useTranslations } from "@/i18n/provider";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, X } from "lucide-react";
-import { Button } from "@/components/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui";
 
 const STORAGE_KEY = "twoplayer:onboarding:v1";
-const steps = [
-  [
-    "Welcome to TwoPlayer",
-    "Choose a game, create a room, and make a focused co-op run with one partner.",
-  ],
-  [
-    "Build a room",
-    "Open a game's room browser, create a public or private room, then share the invite link.",
-  ],
-  [
-    "Ready together",
-    "Both players choose Ready before the host starts. A reconnect keeps the authoritative match state.",
-  ],
-  [
-    "FPS controls",
-    "In a match, use WASD to move, mouse to look, click to fire, R to reload, and E to revive.",
-  ],
-  [
-    "Your run economy",
-    "Scrap is spendable in the current match. Score measures results; Contribution measures your share.",
-  ],
-  [
-    "Play safely",
-    "Leave through the match controls, reconnect when prompted, and use report or block when a player breaks trust.",
-  ],
-] as const;
+const subscribeOnboarding = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+};
+function onboardingPending() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== "done";
+  } catch {
+    return false;
+  }
+}
 
 export function Onboarding({ forceOpen = false }: { forceOpen?: boolean }) {
-  const [open, setOpen] = useState(() => {
-    if (forceOpen || typeof window === "undefined") return forceOpen;
-    try {
-      return window.localStorage.getItem(STORAGE_KEY) !== "done";
-    } catch {
-      return false;
-    }
-  });
+  const t = useTranslations();
+
+  const steps = [
+    [t("platform.onboardingWelcome"), t("platform.onboardingIntro")],
+    [t("platform.buildRoom"), t("platform.buildRoomHelp")],
+    [t("platform.readyTogether"), t("platform.readyTogetherHelp")],
+    [t("platform.fpsControls"), t("platform.fpsControlsHelp")],
+    [t("platform.runEconomy"), t("platform.runEconomyHelp")],
+    [t("platform.playSafely"), t("platform.playSafelyHelp")],
+  ] as const;
+
+  const persistedOpen = useSyncExternalStore(
+    subscribeOnboarding,
+    onboardingPending,
+    () => false,
+  );
+  const [dismissed, setDismissed] = useState(false);
+  const open = !dismissed && (forceOpen || persistedOpen);
   const [step, setStep] = useState(0);
   if (!open) return null;
   const finish = () => {
@@ -58,50 +60,57 @@ export function Onboarding({ forceOpen = false }: { forceOpen?: boolean }) {
         completed: true,
       }),
     }).catch(() => undefined);
-    setOpen(false);
+    setDismissed(true);
   };
   const [title, copy] = steps[step]!;
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-      role="presentation"
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) finish();
+      }}
     >
-      <section
+      <DialogContent
+        showCloseButton={false}
         aria-labelledby="onboarding-title"
         aria-describedby="onboarding-copy"
-        aria-modal="true"
-        role="dialog"
         className="border-border bg-surface-elevated shadow-card w-full max-w-lg rounded-xl border p-6 sm:p-8"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <BookOpen aria-hidden="true" className="text-primary size-6" />
             <p className="text-muted-foreground mt-3 font-mono text-xs tracking-[0.16em] uppercase">
-              First session · {step + 1}/{steps.length}
+              {t("platform.onboardingStep", {
+                current: step + 1,
+                total: steps.length,
+              })}
             </p>
           </div>
           <button
             type="button"
-            aria-label="Skip onboarding"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-2 focus-visible:ring-2"
+            aria-label={t("platform.skipOnboarding")}
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring min-h-11 min-w-11 rounded-md p-2 focus-visible:ring-2"
             onClick={finish}
           >
             <X aria-hidden="true" className="size-5" />
           </button>
         </div>
-        <h2
+        <DialogTitle
           id="onboarding-title"
           className="font-display text-foreground mt-6 text-2xl font-semibold"
         >
           {title}
-        </h2>
-        <p
+        </DialogTitle>
+        <DialogDescription
           id="onboarding-copy"
           className="text-muted-foreground mt-3 leading-7"
         >
           {copy}
-        </p>
-        <div className="mt-6 flex gap-2" aria-label="Onboarding progress">
+        </DialogDescription>
+        <div
+          className="mt-6 flex gap-2"
+          aria-label={t("platform.onboardingProgress")}
+        >
           {steps.map((_, index) => (
             <span
               key={index}
@@ -111,7 +120,7 @@ export function Onboarding({ forceOpen = false }: { forceOpen?: boolean }) {
         </div>
         <div className="mt-8 flex items-center justify-between gap-3">
           <Button type="button" variant="ghost" onClick={finish}>
-            Skip
+            {t("platform.skip")}
           </Button>
           <div className="flex gap-2">
             {step > 0 ? (
@@ -120,7 +129,11 @@ export function Onboarding({ forceOpen = false }: { forceOpen?: boolean }) {
                 variant="outline"
                 onClick={() => setStep((value) => value - 1)}
               >
-                <ArrowLeft aria-hidden="true" className="size-4" /> Back
+                <ArrowLeft
+                  aria-hidden="true"
+                  className="size-4 rtl:rotate-180"
+                />{" "}
+                {t("platform.back")}
               </Button>
             ) : null}
             <Button
@@ -131,12 +144,17 @@ export function Onboarding({ forceOpen = false }: { forceOpen?: boolean }) {
                   : setStep((value) => value + 1)
               }
             >
-              {step === steps.length - 1 ? "Start exploring" : "Next"}
-              <ArrowRight aria-hidden="true" className="size-4" />
+              {step === steps.length - 1
+                ? t("platform.startExploring")
+                : t("platform.next")}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-4 rtl:rotate-180"
+              />
             </Button>
           </div>
         </div>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

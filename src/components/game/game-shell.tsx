@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, Heart, Settings2, Signal, UsersRound } from "lucide-react";
 import {
   Button,
@@ -16,12 +16,15 @@ import {
   loadSettings,
   type GameSettings,
 } from "@/game/shared/settings";
+import { resolveWeaponStats } from "@/game/shared/phase6";
 import type { GameRuntime, HudState } from "@/game/client/runtime";
+import type { ArenaPresentation } from "@/game/client/messages";
 import { INITIAL_PVE_HUD } from "@/game/client/pve-hud";
 import { terminalState } from "@/game/shared/lifecycle";
-import styles from "./game.module.css";
-import { Phase6Shop } from "./phase6-shop";
+import { createTranslator, formatNumber } from "@/i18n/client";
 import type { Locale } from "@/i18n/messages";
+import styles from "./game.module.css";
+import { Phase6Shop, shopFeedbackText } from "./phase6-shop";
 
 const initial: HudState = {
   ...INITIAL_PVE_HUD,
@@ -35,7 +38,7 @@ const initial: HudState = {
   magazine: 30,
   reserve: 120,
   reloading: false,
-  teammate: "Waiting for teammate",
+  teammate: "",
   teammateConnected: false,
   countdown: 0,
   hit: false,
@@ -55,7 +58,8 @@ const initial: HudState = {
   drawCalls: 0,
   triangles: 0,
 };
-
+type WeaponId =
+  keyof typeof import("@/i18n/game-messages").gameMessages.en.weaponNames;
 export function GameShell({
   matchId,
   preferences,
@@ -66,9 +70,11 @@ export function GameShell({
   locale?: Locale;
 }) {
   const router = useRouter();
+  const [startupAttempt, setStartupAttempt] = useState(0);
   const canvas = useRef<HTMLCanvasElement>(null),
     engine = useRef<GameRuntime | null>(null),
-    enter = useRef<HTMLButtonElement>(null);
+    enter = useRef<HTMLButtonElement>(null),
+    shopButton = useRef<HTMLButtonElement>(null);
   const [hud, setHud] = useState(initial),
     [status, setStatus] = useState<
       "loading" | "ready" | "unsupported" | "failed"
@@ -76,8 +82,34 @@ export function GameShell({
     [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS),
     [settingsOpen, setSettingsOpen] = useState(false),
     [leaveOpen, setLeaveOpen] = useState(false),
-    [diagnostics, setDiagnostics] = useState(false),
-    [failure, setFailure] = useState("");
+    [diagnostics, setDiagnostics] = useState(false);
+  const t = createTranslator(locale);
+  const n = (value: number) =>
+    formatNumber(locale, value, { maximumFractionDigits: 0 });
+  const presentation = useMemo<ArenaPresentation>(() => {
+    const translate = createTranslator(locale);
+    return {
+      signs: [
+        translate("arena.signQuarantine"),
+        translate("arena.signNorth"),
+        translate("arena.signHostiles"),
+      ],
+      zombieLabels: {
+        walker: translate("zombieNames.walker"),
+        runner: translate("zombieNames.runner"),
+        spitter: translate("zombieNames.spitter"),
+        brute: translate("zombieNames.brute"),
+        screamer: translate("zombieNames.screamer"),
+      },
+      teammateLabel: (player) =>
+        `\u2068${player.name}\u2069 · ${!player.connected ? translate("connectionStates.Reconnecting") : player.life === "DOWNED" ? translate("arena.teammateRevive") : translate("arena.healthValue", { count: player.health })}`,
+    };
+  }, [locale]);
+  const presentationRef = useRef(presentation);
+  useEffect(() => {
+    presentationRef.current = presentation;
+    engine.current?.presentation(presentation);
+  }, [presentation]);
   useEffect(() => {
     let cancelled = false;
     let instance: GameRuntime | null = null;
@@ -95,7 +127,10 @@ export function GameShell({
       let saved: GameSettings;
       try {
         saved = loadSettings(
-          preferences,
+          {
+            reducedMotion: preferences.reducedMotion,
+            soundEnabled: preferences.soundEnabled,
+          },
           localStorage,
           window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         );
@@ -112,8 +147,9 @@ export function GameShell({
         instance = await GameRuntime.create(
           el,
           saved,
-          (u) => !cancelled && setHud(u),
+          (update) => !cancelled && setHud(update),
           matchId,
+          presentationRef.current,
         );
         if (cancelled) {
           instance.dispose();
@@ -122,12 +158,7 @@ export function GameShell({
         engine.current = instance;
         setStatus("ready");
       } catch {
-        if (!cancelled) {
-          setFailure(
-            "WebGL 2 could not start. Enable hardware acceleration in a supported desktop browser, then reload.",
-          );
-          setStatus("failed");
-        }
+        if (!cancelled) setStatus("failed");
       }
     })();
     return () => {
@@ -135,44 +166,58 @@ export function GameShell({
       instance?.dispose();
       engine.current = null;
     };
-  }, [matchId, preferences]);
+  }, [
+    matchId,
+    preferences.reducedMotion,
+    preferences.soundEnabled,
+    startupAttempt,
+  ]);
+  useEffect(() => {
+    engine.current?.setMenuOpen(settingsOpen || leaveOpen);
+  }, [settingsOpen, leaveOpen]);
   const terminal = terminalState(hud.state);
+  const weapon = resolveWeaponStats(
+    hud.equippedWeapon,
+    hud.loadout?.upgrades[hud.equippedWeapon] ?? 0,
+  );
   const title =
     status === "unsupported"
-      ? "Desktop graphics required"
+      ? t("arena.desktop")
       : status === "failed"
-        ? "Connection failed"
-        : terminal
-          ? hud.phase6Outcome === "VICTORY"
-            ? "Victory · Abomination defeated"
-            : hud.wave.state === "TEAM_DEFEATED"
-              ? "Team defeated"
-              : hud.wave.state === "PHASE_COMPLETE"
-                ? hud.phase6Profile === "phase6-production"
-                  ? "Survival profile complete"
-                  : "Five-wave survival complete"
-                : "Cooperative session ended"
-          : hud.state === "WAITING_FOR_PLAYERS"
-            ? hud.mode === "solo"
-              ? "Preparing solo arena"
-              : "Waiting for your teammate"
-            : hud.state === "LOADING"
-              ? hud.mode === "solo"
-                ? "Preparing your arena"
-                : "Teammate is loading"
-              : hud.state === "COUNTDOWN"
-                ? `Survival begins in ${hud.countdown}`
-                : "Click to enter game";
+        ? t("arena.failed")
+        : status === "loading"
+          ? t("loading.gameplay")
+          : terminal
+            ? hud.phase6Outcome === "VICTORY"
+              ? t("arena.victory")
+              : hud.phase6Outcome === "DEFEAT" ||
+                  hud.wave.state === "TEAM_DEFEATED"
+                ? t("arena.defeated")
+                : hud.wave.state === "PHASE_COMPLETE"
+                  ? t("arena.complete")
+                  : t("arena.ended")
+            : hud.state === "WAITING_FOR_PLAYERS"
+              ? t(hud.mode === "solo" ? "arena.preparingSolo" : "arena.waiting")
+              : hud.state === "LOADING"
+                ? t(
+                    hud.mode === "solo"
+                      ? "arena.preparing"
+                      : "arena.teammateLoading",
+                  )
+                : hud.state === "COUNTDOWN"
+                  ? t("arena.countdown", { count: hud.countdown })
+                  : t("arena.enterTitle");
   const description =
     status === "unsupported"
-      ? "Use a supported desktop browser with pointer lock and WebGL 2."
+      ? t("arena.desktopHelp")
       : status === "failed"
-        ? failure
+        ? t("arena.graphicsHelp")
         : terminal
-          ? "The run has ended. Returning to rooms is available."
-          : hud.mode === "solo"
-            ? "Your server-authoritative solo arena is ready."
-            : "The server preserves the shared arena during reconnect.";
+          ? t("arena.endedHelp")
+          : t(hud.mode === "solo" ? "arena.soloHelp" : "arena.coopHelp");
+  const restoreArenaFocus = () => {
+    (shopButton.current ?? enter.current ?? canvas.current)?.focus();
+  };
   const leave = async () => {
     try {
       await engine.current?.leave();
@@ -180,141 +225,262 @@ export function GameShell({
       router.push("/games/nightfall-protocol/rooms");
     }
   };
+  const updateSetting = (next: GameSettings) => {
+    setSettings(next);
+    engine.current?.configure(next);
+  };
   return (
     <main
       id="main-content"
       className={styles.game}
-      aria-label="Nightfall Protocol survival arena"
+      aria-label={t("arena.label")}
     >
       <canvas
         ref={canvas}
+        tabIndex={-1}
         className={styles.canvas}
-        aria-label="First-person industrial survival arena"
+        aria-label={t("arena.canvas")}
       />
       <div className={styles.top}>
         <div className={styles.panel}>
-          <span className={styles.eyebrow}>NIGHTFALL PROTOCOL</span>
+          <span className={styles.eyebrow}>{t("arena.nightfall")}</span>
           <strong>
-            QUARANTINE YARD <span className={styles.tag}>SURVIVAL</span>
+            {t("arena.yard")}{" "}
+            <span className={styles.tag}>{t("arena.survival")}</span>
           </strong>
           <span className={styles.wave}>
-            Wave {hud.wave.number || 1} /{" "}
-            {hud.phase6Profile === "phase6-production" ? 10 : 5} ·{" "}
-            {hud.wave.state.replaceAll("_", " ")}
+            {t("arena.wave", {
+              number: hud.wave.number || 1,
+              total: hud.phase6Profile === "phase6-production" ? 10 : 5,
+            })}{" "}
+            ·{" "}
+            {hud.bossActive
+              ? t("arena.boss")
+              : t(`waveStates.${hud.wave.state}`)}
           </span>
         </div>
         <div className={`${styles.panel} ${styles.connection}`}>
           <Signal size={17} aria-hidden="true" />
-          <span>{hud.connection}</span>
-          <span className={styles.mono}>{Math.round(hud.ping)} ms</span>
+          <span>{t(`connectionStates.${hud.connection}`)}</span>
+          <span className={styles.mono}>
+            {t("arena.ping", { count: Math.round(hud.ping) })}
+          </span>
           <Button
             variant="ghost"
-            size="sm"
+            className="min-h-11 min-w-11"
             onClick={() => {
               engine.current?.pause();
               setSettingsOpen(true);
             }}
-            aria-label="Open game settings"
+            aria-label={t("arena.openSettings")}
           >
             <Settings2 aria-hidden="true" size={18} />
           </Button>
         </div>
       </div>
       <p className="sr-only" role="status" aria-live="polite">
-        {hud.connection}. {title}
+        {t(`connectionStates.${hud.connection}`)}. {title}
       </p>
+      {hud.shopOpen && !terminal && (
+        <div className={styles.shopNotice}>
+          <strong role="status">{t("gameShop.available")}</strong>
+          <span role="timer" aria-live="off">
+            {t("gameShop.countdown", { count: hud.shopSeconds })}
+          </span>
+          <Button
+            ref={shopButton}
+            className="min-h-11 min-w-11"
+            onClick={() => engine.current?.openShop()}
+          >
+            {t("gameShop.open")}
+          </Button>
+        </div>
+      )}
       {status === "ready" && !terminal && (
         <div className={styles.combatStatus}>
           {hud.life === "DOWNED" && (
             <div className={styles.lifeNotice} role="status">
               <strong>
-                {hud.mode === "solo"
-                  ? "DOWNED · bleed-out in progress"
-                  : "DOWNED · waiting for your teammate"}
+                {t(
+                  hud.mode === "solo" ? "arena.downedSolo" : "arena.downedCoop",
+                )}
               </strong>
               <span className={styles.mono}>
-                Bleed-out in {hud.bleedOutSeconds}s
+                {t("arena.bleedOut", { count: hud.bleedOutSeconds })}
               </span>
               <span>
-                {hud.mode === "solo"
-                  ? "Movement and weapons disabled. No teammate revive is available in solo mode."
-                  : "Movement and weapons disabled. A living teammate can hold E nearby to revive you."}
+                {t(
+                  hud.mode === "solo"
+                    ? "arena.downedSoloHelp"
+                    : "arena.downedCoopHelp",
+                )}
               </span>
             </div>
           )}
           {hud.recoveryPending && (
             <p className={styles.lifeNotice}>
-              {hud.mode === "solo"
-                ? "Recovery pending · reconnect before grace expires"
-                : "Recovery pending · waiting for teammate reconnect"}
+              {t(
+                hud.mode === "solo"
+                  ? "arena.recoverySolo"
+                  : "arena.recoveryCoop",
+              )}
             </p>
           )}
+          {hud.revivePrompt && !hud.reviving && (
+            <p className={styles.revive}>{t("arena.revivePrompt")}</p>
+          )}
+          {hud.reviving && (
+            <div className={styles.revive}>
+              <span>{t("arena.reviveProgress")}</span>
+              <progress
+                aria-label={t("arena.reviveProgress")}
+                value={hud.reviveProgress}
+                max={1}
+              />
+            </div>
+          )}
+          {hud.feedback && (
+            <p className={styles.feedback} role="status">
+              {hud.feedback.code === "waveBegins"
+                ? t("arena.waveBegins", { number: hud.feedback.number })
+                : t(`arena.${hud.feedback.code}`)}
+            </p>
+          )}
+          {hud.damageDirection && (
+            <p className={styles.damage} role="status">
+              {t(`arena.${hud.damageDirection}`)}
+            </p>
+          )}
+          {hud.bossActive && (
+            <div className={styles.lifeNotice}>
+              <strong>
+                {t("arena.boss")} ·{" "}
+                {t("arena.bossPhase", { count: hud.bossPhase })}
+              </strong>
+              <progress
+                aria-label={t("arena.boss")}
+                value={hud.bossHealth}
+                max={hud.bossMaxHealth}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {hud.locked && hud.life === "ALIVE" && !hud.shopVisible && (
+        <div
+          className={`${styles.crosshair} ${hud.hit ? styles.hit : ""}`}
+          style={{ scale: 1 + Math.min(weapon.spread * 12, 0.9) }}
+          aria-hidden="true"
+        >
+          <span />
+          <span />
+          <span />
+          <span />
+          {hud.hit && <b>×</b>}
         </div>
       )}
       <div className={styles.bottom}>
         <div className={styles.panel}>
           <span className={styles.eyebrow}>
-            <Heart size={14} aria-hidden="true" /> VITALS
+            <Heart size={14} aria-hidden="true" />
+            {t("arena.vitals")}
           </span>
           <div className={styles.health}>
-            <strong className={styles.mono}>{hud.health}</strong>
-            <span>{hud.life}</span>
+            <strong className={styles.mono}>{n(hud.health)}</strong>
+            <span>{t(`lifeStates.${hud.life}`)}</span>
           </div>
           <progress
             className={styles.healthBar}
-            aria-label="Your health"
+            aria-label={t("arena.health")}
             value={hud.health}
             max={hud.maxHealth}
           />
+          <span className={styles.wave}>
+            {t("arena.scrap", { count: hud.scrap })}
+          </span>
         </div>
         <div className={`${styles.panel} ${styles.teammate}`}>
           <span className={styles.eyebrow}>
-            <UsersRound size={14} aria-hidden="true" />{" "}
-            {hud.mode === "solo" ? "MODE" : "TEAMMATE"}
+            <UsersRound size={14} aria-hidden="true" />
+            {t(hud.mode === "solo" ? "arena.mode" : "arena.teammate")}
           </span>
-          <strong>{hud.mode === "solo" ? "SOLO" : hud.teammate}</strong>
+          <strong dir="auto">
+            {hud.mode === "solo"
+              ? t("arena.solo")
+              : hud.teammate || t("arena.waiting")}
+          </strong>
           <span>
             {hud.mode === "solo"
-              ? "One player · server authoritative"
+              ? t("arena.soloAuthority")
               : hud.teammateConnected
-                ? `${hud.teammateHealth} HP · ${hud.teammateLife}`
-                : "Waiting / reconnecting"}
+                ? `${t("arena.healthValue", { count: hud.teammateHealth })} · ${t(`lifeStates.${hud.teammateLife}`)}`
+                : t("arena.waitingConnection")}
+          </span>
+          <span>
+            {t("arena.score", { count: hud.score })} ·{" "}
+            {t("arena.contribution", { count: hud.contribution })}
           </span>
         </div>
-        <div className={`${styles.panel} ${styles.ammo}`}>
-          <span className={styles.eyebrow}>AR-01 / SERVICE RIFLE</span>
-          <div>
-            <strong className={styles.mono}>
-              {String(hud.magazine).padStart(2, "0")}
-            </strong>
-            <span className={styles.mono}> / {hud.reserve}</span>
+        <div
+          className={`${styles.panel} ${styles.ammo}`}
+          data-testid="weapon-hud"
+          data-weapon={hud.equippedWeapon}
+        >
+          <span className={styles.eyebrow}>
+            {t(`weaponNames.${hud.equippedWeapon as WeaponId}`)}
+          </span>
+          <div dir="ltr">
+            <strong className={styles.mono}>{n(hud.magazine)}</strong>
+            <span className={styles.mono}> / {n(hud.reserve)}</span>
           </div>
           <span>
             {hud.reloading
-              ? "Reloading…"
+              ? t("arena.reloading")
               : hud.magazine === 0
-                ? "Empty magazine · R to reload"
-                : "AUTO · R to reload"}
+                ? t("arena.empty")
+                : t("arena.reloadHint", {
+                    mode: t(`fireModes.${weapon.fireMode}`),
+                  })}
           </span>
+          <span>{t("arena.switches")}</span>
         </div>
       </div>
-      {status !== "ready" || !hud.locked || terminal ? (
+      {(status !== "ready" || !hud.locked || terminal) && !hud.shopVisible && (
         <section className={styles.scrim} aria-labelledby="arena-status">
           <div className={styles.card}>
             <div className={styles.cardIcon}>
               <Crosshair aria-hidden="true" />
             </div>
-            <span className={styles.eyebrow}>TWO PLAYER / ONE SESSION</span>
+            <span className={styles.eyebrow}>{t("arena.session")}</span>
             <h1 id="arena-status">{title}</h1>
             <p>{description}</p>
+            {hud.error && <p role="alert">{t(`gameErrors.${hud.error}`)}</p>}
             {status === "ready" && !terminal && (
               <Button ref={enter} onClick={() => engine.current?.enter()}>
-                Enter arena
+                {t("arena.enter")}
+              </Button>
+            )}
+            {hud.shopOpen && (
+              <Button
+                variant="secondary"
+                onClick={() => engine.current?.openShop()}
+              >
+                {t("gameShop.open")}
               </Button>
             )}
             {status === "failed" && (
-              <Button onClick={() => window.location.reload()}>
-                Reload game
+              <Button
+                onClick={() => {
+                  setStatus("loading");
+                  setStartupAttempt((attempt) => attempt + 1);
+                }}
+              >
+                {t("arena.reloadGame")}
+              </Button>
+            )}
+            {hud.connection === "Failed" && (
+              <Button onClick={() => engine.current?.retry()}>
+                {t("common.retry")}
               </Button>
             )}
             <div className={styles.actions}>
@@ -322,98 +488,192 @@ export function GameShell({
                 className={buttonVariants({ variant: "secondary" })}
                 href="/games/nightfall-protocol/rooms"
               >
-                Return to rooms
+                {t("arena.rooms")}
               </Link>
               {status === "ready" && !terminal && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    engine.current?.pause();
-                    setLeaveOpen(true);
-                  }}
-                >
-                  Leave match
-                </Button>
-              )}
-              {status === "ready" && !terminal && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    engine.current?.pause();
-                    setSettingsOpen(true);
-                  }}
-                >
-                  Settings
-                </Button>
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      engine.current?.pause();
+                      setLeaveOpen(true);
+                    }}
+                  >
+                    {t("arena.leave")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      engine.current?.pause();
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    {t("arena.settings")}
+                  </Button>
+                </>
               )}
             </div>
+            {!terminal && (
+              <>
+                <div
+                  className={styles.controls}
+                  aria-label={t("arena.controls")}
+                >
+                  {(
+                    [
+                      ["WASD", "move"],
+                      ["Shift", "sprint"],
+                      ["Space", "jump"],
+                      ["Ctrl", "crouch"],
+                      ["R", "reload"],
+                      ["E", "interact"],
+                      ["B", "shop"],
+                      ["Escape", "pause"],
+                    ] as const
+                  ).map(([binding, label]) => (
+                    <span key={binding}>
+                      <kbd dir="ltr">{binding}</kbd>
+                      {t(`arena.${label}`)}
+                    </span>
+                  ))}
+                </div>
+                <p className={styles.note}>{t("arena.controlsHelp")}</p>
+              </>
+            )}
+            {terminal && (
+              <p>
+                {t("arena.score", { count: hud.score })} ·{" "}
+                {t("arena.contribution", { count: hud.contribution })}
+              </p>
+            )}
           </div>
         </section>
-      ) : null}
+      )}
+      {!hud.shopVisible && hud.shopFeedback && (
+        <p className={styles.resultNotice} role="status" aria-live="polite">
+          {shopFeedbackText(locale, hud.shopFeedback)}
+        </p>
+      )}
       <Phase6Shop
-        open={hud.shopOpen && hud.locked && !terminal}
-        scrap={hud.scrap}
-        ownedWeapons={hud.ownedWeapons}
-        equippedWeapon={hud.equippedWeapon}
-        onPurchase={(kind, id) => engine.current?.purchasePhase6(kind, id)}
-        onClose={() => engine.current?.pause()}
+        open={hud.shopVisible && hud.shopOpen && !terminal}
+        loadout={hud.loadout}
+        seconds={hud.shopSeconds}
+        wave={hud.wave.number + 1}
+        pending={hud.shopPending}
+        feedback={hud.shopFeedback}
+        onPurchase={(kind, id, replacing) =>
+          engine.current?.purchasePhase6(kind, id, replacing)
+        }
+        onEquip={(id, slot) => engine.current?.equipWeapon(id, slot)}
+        onClose={() => engine.current?.closeShop()}
+        onReturn={() => engine.current?.enter()}
+        restoreFocus={restoreArenaFocus}
         locale={locale}
       />
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent>
-          <DialogTitle>Game settings</DialogTitle>
-          <DialogDescription>
-            Changes apply immediately while the online match continues.
-          </DialogDescription>
+        <DialogContent
+          closeLabel={t("common.close")}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            restoreArenaFocus();
+          }}
+        >
+          <DialogTitle>{t("arena.settingsTitle")}</DialogTitle>
+          <DialogDescription>{t("arena.settingsHelp")}</DialogDescription>
+          {(
+            [
+              ["sensitivity", 0.2, 3, 0.1],
+              ["volume", 0, 1, 0.05],
+              ["fov", 65, 105, 1],
+            ] as const
+          ).map(([key, min, max, step]) => (
+            <label key={key} className={styles.setting}>
+              <span>
+                {t(`arena.${key}`)}
+                <output>
+                  {formatNumber(locale, settings[key], {
+                    maximumFractionDigits: 2,
+                  })}
+                </output>
+              </span>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={settings[key]}
+                onChange={(event) =>
+                  updateSetting({
+                    ...settings,
+                    [key]: Number(event.target.value),
+                  })
+                }
+              />
+            </label>
+          ))}
+          {(
+            [
+              ["reducedMotion", "reduceMotion"],
+              ["invertY", "invert"],
+              ["screenFlashes", "flashes"],
+              ["cameraShake", "cameraShake"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className={styles.check}>
+              <span>{t(`arena.${label}`)}</span>
+              <input
+                type="checkbox"
+                checked={settings[key]}
+                onChange={(event) =>
+                  updateSetting({ ...settings, [key]: event.target.checked })
+                }
+              />
+            </label>
+          ))}
           <label className={styles.check}>
-            <span>Reduce camera motion and weapon bob</span>
-            <input
-              type="checkbox"
-              checked={settings.reducedMotion}
-              onChange={(e) => {
-                const next = { ...settings, reducedMotion: e.target.checked };
-                setSettings(next);
-                engine.current?.configure(next);
-              }}
-            />
-          </label>
-          <label className={styles.check}>
-            <span>Network and performance diagnostics</span>
+            <span>{t("arena.diagnostics")}</span>
             <input
               type="checkbox"
               checked={diagnostics}
-              onChange={(e) => setDiagnostics(e.target.checked)}
+              onChange={(event) => setDiagnostics(event.target.checked)}
             />
           </label>
           <Button
             variant="secondary"
-            onClick={() => {
-              setSettings(DEFAULT_SETTINGS);
-              engine.current?.configure(DEFAULT_SETTINGS);
-            }}
+            onClick={() => updateSetting(DEFAULT_SETTINGS)}
           >
-            Restore defaults
+            {t("arena.defaults")}
           </Button>
         </DialogContent>
       </Dialog>
       <Dialog open={leaveOpen} onOpenChange={setLeaveOpen}>
-        <DialogContent>
-          <DialogTitle>Leave this match?</DialogTitle>
-          <DialogDescription>
-            This ends the session and returns you to rooms.
-          </DialogDescription>
+        <DialogContent
+          closeLabel={t("common.close")}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            restoreArenaFocus();
+          }}
+        >
+          <DialogTitle>{t("arena.leaveTitle")}</DialogTitle>
+          <DialogDescription>{t("arena.leaveHelp")}</DialogDescription>
           <Button variant="secondary" onClick={() => setLeaveOpen(false)}>
-            Stay in match
+            {t("arena.stay")}
           </Button>
           <Button variant="destructive" onClick={() => void leave()}>
-            Leave match
+            {t("arena.leave")}
           </Button>
         </DialogContent>
       </Dialog>
       {process.env.NODE_ENV !== "production" && diagnostics && (
-        <pre className={styles.diagnostics} aria-label="Game diagnostics">
-          {hud.fps} FPS / {hud.frameMs.toFixed(1)} ms\nPing{" "}
-          {hud.ping.toFixed(0)} ms · tick {hud.serverTick}
+        <pre className={styles.diagnostics} aria-label={t("arena.diagnostics")}>
+          {t("arena.diagnosticValue", {
+            fps: hud.fps,
+            time: formatNumber(locale, hud.frameMs, {
+              maximumFractionDigits: 1,
+            }),
+            ping: Math.round(hud.ping),
+            tick: hud.serverTick,
+          })}
         </pre>
       )}
     </main>

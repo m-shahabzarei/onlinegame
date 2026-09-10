@@ -1,12 +1,15 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { Card, CardContent, CardHeader, Skeleton } from "@/components/ui";
 
-export default function Loading() {
+export default async function Loading() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <main
       id="main-content"
       className="mx-auto min-h-dvh w-full max-w-screen-2xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16 2xl:px-12"
       aria-busy="true"
-      aria-label="Loading page"
+      aria-label={t("pages.loadingPage")}
     >
       <Card className="min-h-72" variant="elevated">
         <CardHeader>

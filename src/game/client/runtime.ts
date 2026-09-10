@@ -2,7 +2,7 @@ import {
   LIMITS,
   MAP_ID,
   MAP_VERSION,
-  RIFLE,
+  PROTOCOL_VERSION,
   SIMULATION,
 } from "../shared/config";
 import { terminalState } from "../shared/lifecycle";
@@ -14,6 +14,8 @@ import {
 } from "../shared/prediction";
 import type {
   MatchState,
+  ClientMessage,
+  WeaponState,
   ServerMessage,
   WorldSnapshot,
 } from "../shared/protocol";
@@ -28,14 +30,21 @@ import { GameAudio } from "./audio";
 import { GameInput } from "./input";
 import { GameplayNetwork, type ConnectionState } from "./network";
 import { ArenaRenderer } from "./rendering";
-import { INITIAL_PVE_HUD, type PvEHud } from "./pve-hud";
+import { INITIAL_PVE_HUD, type PvEHud, type ShopFeedback } from "./pve-hud";
+import { resolveWeaponStats, type Phase6Snapshot } from "../shared/phase6";
+import type {
+  ArenaPresentation,
+  CombatNotice,
+  DamageDirection,
+  RuntimeErrorCode,
+} from "./messages";
 import { emptyWave, type PvEEvent } from "../shared/pve";
 import type { GameMode } from "@/domain/lobby";
 export interface HudState extends PvEHud {
   connection: ConnectionState;
   mode: GameMode;
   state: MatchState;
-  error: string;
+  error: RuntimeErrorCode | "";
   locked: boolean;
   contextLost: boolean;
   health: number;
@@ -74,7 +83,7 @@ export const INITIAL_HUD: HudState = {
   magazine: 30,
   reserve: 120,
   reloading: false,
-  teammate: "Waiting for teammate",
+  teammate: "",
   teammateConnected: false,
   countdown: 0,
   hit: false,
@@ -115,9 +124,9 @@ export class GameRuntime {
   private reloadSeq = 0;
   private nextFire = 0;
   private hitUntil = 0;
-  private feedback = "";
+  private feedback: CombatNotice | null = null;
   private feedbackUntil = 0;
-  private damageDirection = "";
+  private damageDirection: DamageDirection | null = null;
   private damageUntil = 0;
   private eventSeq = 0;
   private interactionSeq = 0;
@@ -129,7 +138,21 @@ export class GameRuntime {
   private disposed = false;
   private sceneReady = false;
   private lost = false;
-  private error = "";
+  private error: RuntimeErrorCode | "" = "";
+  private shopVisible = false;
+  private menuOpen = false;
+  private observedShopUntil = 0;
+  private shopFeedback: ShopFeedback | null = null;
+  private pendingShop: {
+    requestId: string;
+    kind: ShopFeedback["kind"];
+    weaponId?: string | undefined;
+    sentAt: number;
+  } | null = null;
+  private equipSeq = 0;
+  private firedTrigger = 0;
+  private stats = resolveWeaponStats("ar-01", 0);
+  private statsLevel = 0;
   private frame = 0;
   private lastFrame = 0;
   private frameMs = 16.67;
@@ -148,9 +171,16 @@ export class GameRuntime {
     settings: GameSettings,
     publish: (hud: HudState) => void,
     matchId: string,
+    presentation?: ArenaPresentation,
   ) {
     await initPhysics();
-    const runtime = new GameRuntime(canvas, settings, publish, matchId);
+    const runtime = new GameRuntime(
+      canvas,
+      settings,
+      publish,
+      matchId,
+      presentation,
+    );
     try {
       await runtime.view.prepare();
       if (!runtime.disposed) {
@@ -169,16 +199,19 @@ export class GameRuntime {
     settings: GameSettings,
     readonly publish: (hud: HudState) => void,
     matchId: string,
+    presentation?: ArenaPresentation,
   ) {
     this.settings = settings;
     try {
-      this.view = new ArenaRenderer(canvas, (lost) => {
-        this.lost = lost;
-        this.input.release();
-        this.error = lost
-          ? "Graphics context lost. Waiting for your browser to restore it…"
-          : "";
-      });
+      this.view = new ArenaRenderer(
+        canvas,
+        (lost) => {
+          this.lost = lost;
+          this.input.release();
+          this.error = lost ? "GRAPHICS_LOST" : "";
+        },
+        presentation,
+      );
     } catch (error) {
       this.physics.dispose();
       throw error;
@@ -200,10 +233,21 @@ export class GameRuntime {
       () => this.settings,
       () => this.canPlay(),
       (_locked, error) => {
-        if (error) this.error = error;
+        if (error) this.error = "POINTER_LOCK_DENIED";
       },
       () => this.reload(),
       (held) => this.interact(held),
+      () => this.toggleShop(),
+      (slot) => this.equipSlot(slot),
+      (seq) => {
+        const sent = this.network.send({
+          v: PROTOCOL_VERSION,
+          type: "triggerRelease",
+          seq,
+        });
+        if (!sent && !this.disposed && this.network.state === "Connected")
+          this.network.retry();
+      },
     );
     this.uiTimer = setInterval(() => this.sampleHud(), 100);
     document.addEventListener(
@@ -224,13 +268,103 @@ export class GameRuntime {
   private self() {
     return this.snapshot?.players.find((p) => p.id === this.selfId);
   }
+  private loadout() {
+    return this.snapshot?.phase6?.players[this.selfId];
+  }
+  private weapon() {
+    const loadout = this.loadout();
+    return loadout?.ammo[loadout.equippedWeapon] ?? this.self()?.weapon;
+  }
+  private syncWeapon() {
+    const loadout = this.loadout();
+    if (!loadout) return;
+    const teammate = this.snapshot?.players.find((p) => p.id !== this.selfId);
+    if (teammate)
+      this.view.remoteWeapon(
+        this.snapshot?.phase6?.players[teammate.id]?.equippedWeapon ?? "ar-01",
+      );
+    const level = loadout.upgrades[loadout.equippedWeapon] ?? 0;
+    if (this.stats.id !== loadout.equippedWeapon || this.statsLevel !== level) {
+      this.stats = resolveWeaponStats(loadout.equippedWeapon, level);
+      this.statsLevel = level;
+      this.view.equip(this.stats);
+    }
+    this.nextFire = Math.max(
+      this.nextFire,
+      performance.now() +
+        Math.max(0, loadout.nextFireAt - this.network.serverNow()),
+    );
+    const self = this.self();
+    if (self) self.weapon = loadout.ammo[loadout.equippedWeapon]!;
+    this.shotSeq = Math.max(this.shotSeq, loadout.lastShot);
+    this.reloadSeq = Math.max(this.reloadSeq, loadout.lastReload);
+    this.equipSeq = Math.max(this.equipSeq, loadout.lastEquip);
+  }
+  private acceptWeapon(weaponId: string, weapon: WeaponState) {
+    const loadout = this.loadout();
+    if (loadout?.ammo[weaponId]) loadout.ammo[weaponId] = weapon;
+    const self = this.self();
+    if (self && (!loadout || loadout.equippedWeapon === weaponId))
+      self.weapon = weapon;
+  }
+  private acceptPhase6(phase6: Phase6Snapshot) {
+    if (
+      !this.snapshot ||
+      phase6.revision < (this.snapshot.phase6?.revision ?? -1)
+    )
+      return;
+    this.snapshot.phase6 = phase6;
+    this.syncWeapon();
+    this.syncShop();
+  }
+  private shopAvailable() {
+    return (
+      this.canPlay() &&
+      this.self()?.life === "ALIVE" &&
+      this.snapshot?.pve.wave.state === "INTERMISSION" &&
+      !!this.snapshot.phase6?.shopOpen &&
+      this.network.serverNow() < this.snapshot.phase6.shopUntil
+    );
+  }
+  private syncShop() {
+    const until = this.snapshot?.phase6?.shopUntil ?? 0;
+    if (!this.shopAvailable()) {
+      if (this.shopVisible) this.closeShop();
+      return;
+    }
+    if (until !== this.observedShopUntil) {
+      this.openShop();
+      if (this.shopVisible) this.observedShopUntil = until;
+    }
+  }
+  openShop() {
+    if (!this.shopAvailable() || this.menuOpen) return;
+    this.shopVisible = true;
+    this.input.suspended = true;
+    this.input.release();
+  }
+  closeShop() {
+    this.shopVisible = false;
+    this.input.suspended = false;
+  }
+  private toggleShop() {
+    if (this.shopVisible) this.closeShop();
+    else this.openShop();
+  }
+  setMenuOpen(open: boolean) {
+    this.menuOpen = open;
+    this.input.suspended = open || this.shopVisible;
+    if (open) this.input.release();
+  }
   private canPlay() {
     return (
       this.network.state === "Connected" &&
       !this.lost &&
       !!this.self()?.ready &&
       !!this.snapshot &&
-      ["PLAYING", "RECONNECTING"].includes(this.snapshot.state) &&
+      ["PLAYING", "RECONNECTING", "BOSS_ACTIVE"].includes(
+        this.snapshot.state,
+      ) &&
       this.network.serverNow() - this.snapshot.time < 1000
     );
   }
@@ -257,13 +391,20 @@ export class GameRuntime {
       this.seq = self.lastInput;
       this.shotSeq = self.weapon.lastShot;
       this.reloadSeq = self.weapon.lastReload;
+      const loadout = message.snapshot.phase6?.players[this.selfId];
+      this.shotSeq = loadout?.lastShot ?? this.shotSeq;
+      this.reloadSeq = loadout?.lastReload ?? this.reloadSeq;
+      this.equipSeq = loadout?.lastEquip ?? 0;
+      this.input.triggerSeq = loadout?.lastTrigger ?? 0;
+      this.firedTrigger = this.input.triggerSeq;
+      this.pendingShop = null;
       this.prediction.reset(self.lastInput);
       this.snapshots.reset();
       this.snapshot = null;
       this.interactionSeq = 0;
       this.eventSeq = message.snapshot.pve.eventSeq;
       this.confirmedShots.clear();
-      this.feedback = "";
+      this.feedback = null;
       this.feedbackUntil = 0;
       this.damageUntil = 0;
       this.hitUntil = 0;
@@ -272,7 +413,7 @@ export class GameRuntime {
       this.error = "";
       if (this.sceneReady)
         this.network.send({
-          v: 2,
+          v: 3,
           type: "clientReady",
           mapId: MAP_ID,
           mapVersion: MAP_VERSION,
@@ -287,30 +428,41 @@ export class GameRuntime {
       this.eventSeq = message.seq;
       this.snapshot.pve.wave = message.wave;
       const state = message.wave.state;
+      const complete =
+        state === "PHASE_COMPLETE" &&
+        (this.snapshot.phase6?.profile !== "phase6-production" ||
+          this.snapshot.phase6.outcome === "VICTORY");
       this.feedback =
         state === "ACTIVE"
-          ? `Wave ${message.wave.number} begins`
+          ? { code: "waveBegins", number: message.wave.number }
           : state === "INTERMISSION"
-            ? "Wave cleared · regroup and reload"
-            : state === "PHASE_COMPLETE"
-              ? "Five-wave survival complete"
+            ? { code: "waveCleared" }
+            : complete
+              ? { code: "complete" }
               : state === "TEAM_DEFEATED"
-                ? "Team defeated"
-                : "";
+                ? { code: "defeated" }
+                : null;
+      this.syncShop();
       this.feedbackUntil = performance.now() + 2600;
       if (state === "ACTIVE") this.audio.play("waveStart");
       if (state === "INTERMISSION") this.audio.play("waveClear");
-      if (state === "PHASE_COMPLETE") this.audio.play("complete");
+      if (complete) this.audio.play("complete");
       if (state === "TEAM_DEFEATED") this.audio.play("defeat");
     } else if (message.type === "worldSnapshot")
       this.accept(message.snapshot, true);
     else if (message.type === "phase6State") {
-      if (
-        this.snapshot &&
-        message.snapshot.revision >= (this.snapshot.phase6?.revision ?? -1)
-      ) {
-        this.snapshot.phase6 = message.snapshot;
-      }
+      this.acceptPhase6(message.snapshot);
+    } else if (message.type === "shopResult") {
+      const pending = this.pendingShop;
+      this.acceptPhase6(message.snapshot);
+      this.shopFeedback = {
+        requestId: message.requestId,
+        code: message.code,
+        ...(pending?.requestId === message.requestId
+          ? { kind: pending.kind, weaponId: pending.weaponId }
+          : {}),
+      };
+      if (pending?.requestId === message.requestId) this.pendingShop = null;
     } else if (message.type === "matchState") {
       if (this.snapshot) {
         this.snapshot.state = message.state;
@@ -321,10 +473,11 @@ export class GameRuntime {
         this.network.dispose();
         this.error =
           message.state === "ERROR"
-            ? "The gameplay server ended this session. Return to rooms to try again."
+            ? "SERVER_ENDED"
             : message.state === "CANCELLED"
-              ? "The session was cancelled before both players were ready."
-              : "The cooperative session has ended.";
+              ? "SESSION_CANCELLED"
+              : "SESSION_ENDED";
+        this.closeShop();
       }
     } else if (message.type === "movementCorrection") {
       this.prediction.reset(message.player.lastInput);
@@ -342,36 +495,40 @@ export class GameRuntime {
         message.origin,
         message.point,
         this.settings.screenFlashes && !this.settings.reducedMotion,
+        resolveWeaponStats(message.weaponId, 0).impactEffect,
       );
       if (message.playerId === this.selfId) {
-        const self = this.self();
-        if (self) self.weapon = message.weapon;
+        this.acceptWeapon(message.weaponId, message.weapon);
         if (message.targetId) {
           this.hitUntil = performance.now() + 220;
           this.audio.play("impact");
           if (message.zombieHit) {
             this.feedback = message.zombieHit.killed
-              ? "Zombie eliminated"
+              ? { code: "eliminated" }
               : message.zombieHit.region === "head"
-                ? "Headshot"
-                : "Confirmed hit";
+                ? { code: "headshot" }
+                : { code: "hit" };
             this.feedbackUntil =
               performance.now() + (message.zombieHit.killed ? 900 : 400);
           }
         }
       } else {
         this.view.remoteShot();
-        this.audio.play("fire", message.origin);
+        this.audio.playWeapon(
+          "fire",
+          resolveWeaponStats(message.weaponId, 0),
+          message.origin,
+        );
       }
     } else if (message.type === "shotRejected") {
-      const self = this.self();
-      if (self) self.weapon = message.weapon;
+      this.acceptWeapon(message.weaponId, message.weapon);
       if (message.code === "EMPTY") this.audio.play("empty");
     } else if (message.type === "weaponState") {
       const self = this.self();
       if (self && message.playerId === this.selfId) {
-        self.weapon = message.weapon;
-        if (message.event === "reloadStarted") this.audio.play("reload");
+        this.acceptWeapon(message.weaponId, message.weapon);
+        if (message.event === "reloadStarted")
+          this.audio.playWeapon("reload", this.stats);
       }
     }
   }
@@ -382,6 +539,15 @@ export class GameRuntime {
     if (previousWave && previousWave.revision > snapshot.pve.wave.revision)
       snapshot.pve.wave = previousWave;
     this.snapshot = snapshot;
+    this.syncWeapon();
+    this.syncShop();
+    if (
+      this.pendingShop &&
+      performance.now() - this.pendingShop.sentAt > 8000
+    ) {
+      this.pendingShop = null;
+      this.network.retry();
+    }
     this.eventSeq = Math.max(this.eventSeq, snapshot.pve.eventSeq);
     this.snapshots.push(snapshot);
     this.view.updateTargets(snapshot.targets);
@@ -448,18 +614,20 @@ export class GameRuntime {
         this.input.firing &&
         this.input.active() &&
         this.canFight() &&
-        time >= this.nextFire
+        time >= this.nextFire &&
+        (this.stats.fireMode === "automatic" ||
+          this.firedTrigger !== this.input.triggerSeq)
       ) {
-        this.nextFire = time + RIFLE.fireIntervalMs;
-        const weapon = this.self()?.weapon;
+        this.nextFire = time + this.stats.fireIntervalMs;
+        const weapon = this.weapon();
         if (weapon && !weapon.reloadAt) {
           if (weapon.magazine) {
-            this.view.localShot();
-            this.audio.play("fire");
-            this.network.send({
-              v: 2,
+            this.firedTrigger = this.input.triggerSeq;
+            const sent = this.network.send({
+              v: PROTOCOL_VERSION,
               type: "fire",
               seq: ++this.shotSeq,
+              triggerSeq: this.input.triggerSeq,
               tick: this.tick,
               viewTick: Math.max(
                 0,
@@ -474,6 +642,10 @@ export class GameRuntime {
               yaw: this.input.yaw,
               pitch: this.input.pitch,
             });
+            if (sent) {
+              this.view.localShot(this.stats);
+              this.audio.playWeapon("fire", this.stats);
+            }
           } else this.audio.play("empty");
         }
       }
@@ -490,7 +662,7 @@ export class GameRuntime {
         this.input,
         this.settings,
         delta,
-        !!this.self()?.weapon.reloadAt,
+        !!this.weapon()?.reloadAt,
       );
       this.audio.listener(
         this.view.camera.position,
@@ -502,6 +674,7 @@ export class GameRuntime {
   };
   private sampleHud() {
     if (this.disposed) return;
+    this.syncShop();
     const now = performance.now(),
       seconds = (now - this.ratesAt) / 1000;
     if (seconds >= 1) {
@@ -574,8 +747,8 @@ export class GameRuntime {
         : 0,
       reviving: !!revive,
       recoveryPending: pve?.recoveryPending ?? false,
-      feedback: now < this.feedbackUntil ? this.feedback : "",
-      damageDirection: now < this.damageUntil ? this.damageDirection : "",
+      feedback: now < this.feedbackUntil ? this.feedback : null,
+      damageDirection: now < this.damageUntil ? this.damageDirection : null,
       pooledZombies: this.view.zombies.store.pooled,
       activeZombies: this.view.zombies.store.active.size,
       zombieCorrections: this.view.zombies.store.slots.reduce(
@@ -591,10 +764,10 @@ export class GameRuntime {
       locked: this.input.locked,
       contextLost: this.lost,
       health: self?.health ?? 100,
-      magazine: self?.weapon.magazine ?? 30,
-      reserve: self?.weapon.reserve ?? 120,
-      reloading: !!self?.weapon.reloadAt,
-      teammate: teammate?.name ?? "Waiting for teammate",
+      magazine: this.weapon()?.magazine ?? 30,
+      reserve: this.weapon()?.reserve ?? 120,
+      reloading: !!this.weapon()?.reloadAt,
+      teammate: teammate?.name ?? "",
       teammateConnected: teammate?.connected ?? false,
       countdown: Math.max(
         0,
@@ -623,8 +796,16 @@ export class GameRuntime {
       medkits: phase6?.players[this.selfId]?.medkits ?? 0,
       grenades: phase6?.players[this.selfId]?.grenades ?? 0,
       sentries: phase6?.players[this.selfId]?.sentries ?? 0,
-      shopOpen: phase6?.shopOpen ?? false,
+      shopOpen: this.shopAvailable(),
       shopUntil: phase6?.shopUntil ?? 0,
+      shopVisible: this.shopVisible,
+      shopSeconds: Math.max(
+        0,
+        Math.ceil(((phase6?.shopUntil ?? 0) - serverNow) / 1000),
+      ),
+      shopFeedback: this.shopFeedback,
+      shopPending: !!this.pendingShop,
+      loadout: this.loadout() ?? null,
       bossHealth: phase6?.boss?.health ?? 0,
       bossMaxHealth: phase6?.boss?.maxHealth ?? 0,
       bossPhase: phase6?.boss?.phase ?? 0,
@@ -637,36 +818,70 @@ export class GameRuntime {
   }
   reload() {
     if (this.input.active() && this.canFight())
-      this.network.send({ v: 2, type: "reload", seq: ++this.reloadSeq });
+      this.network.send({ v: 3, type: "reload", seq: ++this.reloadSeq });
   }
   purchasePhase6(
-    kind:
-      "weapon" | "ammo" | "upgrade" | "armor" | "medkit" | "grenade" | "sentry",
+    kind: "weapon" | "ammo" | "upgrade",
     id?: string,
+    replaceWeaponId?: string,
   ) {
-    if (!this.canPlay()) return;
-    const requestId =
-      globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    const type =
+    if (!this.shopAvailable() || this.pendingShop) return;
+    const requestId = crypto.randomUUID();
+    const base = { v: PROTOCOL_VERSION, requestId };
+    const message: ClientMessage =
       kind === "weapon"
-        ? "purchaseWeapon"
+        ? {
+            ...base,
+            type: "purchaseWeapon",
+            weaponId: id ?? "",
+            ...(replaceWeaponId ? { replaceWeaponId } : {}),
+          }
         : kind === "ammo"
-          ? "purchaseAmmo"
-          : kind === "upgrade"
-            ? "purchaseUpgrade"
-            : kind === "armor"
-              ? "purchaseArmor"
-              : kind === "medkit"
-                ? "purchaseMedkit"
-                : kind === "grenade"
-                  ? "purchaseGrenade"
-                  : "purchaseDeployable";
-    this.network.send({
-      v: 2,
-      type,
-      requestId,
-      ...(id ? { [kind === "weapon" ? "weaponId" : "upgradeId"]: id } : {}),
-    } as never);
+          ? { ...base, type: "purchaseAmmo", weaponId: id ?? this.stats.id }
+          : { ...base, type: "purchaseUpgrade", upgradeId: id ?? "" };
+    if (this.network.send(message))
+      this.pendingShop = {
+        requestId,
+        kind,
+        weaponId: kind === "weapon" ? id : undefined,
+        sentAt: performance.now(),
+      };
+  }
+  equipSlot(slot: "primary" | "secondary") {
+    if (!this.input.active()) return;
+    const weaponId = this.loadout()?.slots[slot];
+    if (weaponId) this.equipWeapon(weaponId, slot);
+    else
+      this.shopFeedback = {
+        requestId: crypto.randomUUID(),
+        code: "invalid_weapon",
+        kind: "equip",
+      };
+  }
+  equipWeapon(weaponId: string, slot: "primary" | "secondary") {
+    if (!this.canFight() || this.pendingShop) return;
+    const requestId = crypto.randomUUID();
+    this.input.clear();
+    if (
+      this.network.send({
+        v: PROTOCOL_VERSION,
+        type: "equipWeapon",
+        requestId,
+        weaponId,
+        slot,
+        seq: ++this.equipSeq,
+      })
+    ) {
+      this.pendingShop = {
+        requestId,
+        kind: "equip",
+        weaponId,
+        sentAt: performance.now(),
+      };
+    }
+  }
+  presentation(presentation: ArenaPresentation) {
+    this.view.presentation(presentation);
   }
   private reviveTarget() {
     if (this.hudMode === "solo") return;
@@ -687,7 +902,7 @@ export class GameRuntime {
   private interact(held: boolean) {
     if (!held) {
       this.network.send({
-        v: 2,
+        v: 3,
         type: "cancelRevive",
         seq: ++this.interactionSeq,
       });
@@ -697,7 +912,7 @@ export class GameRuntime {
     const target = this.reviveTarget();
     if (target && this.input.active())
       this.network.send({
-        v: 2,
+        v: 3,
         type: "beginRevive",
         seq: ++this.interactionSeq,
         targetId: target.id,
@@ -722,10 +937,10 @@ export class GameRuntime {
       ) {
         this.feedback =
           event.detail === "scream"
-            ? "Screamer calling reinforcements"
+            ? { code: "scream" }
             : event.detail === "spitter"
-              ? "Spitter aiming · move"
-              : "Brute winding up";
+              ? { code: "spitter" }
+              : { code: "brute" };
         this.feedbackUntil = performance.now() + 1600;
       }
     }
@@ -753,31 +968,32 @@ export class GameRuntime {
       const relative = Math.atan2(Math.sin(angle), Math.cos(angle));
       this.damageDirection =
         Math.abs(relative) < Math.PI / 4
-          ? "Damage from ahead"
+          ? "damageFront"
           : Math.abs(relative) > Math.PI * 0.75
-            ? "Damage from behind"
+            ? "damageBack"
             : relative > 0
-              ? "Damage from right"
-              : "Damage from left";
+              ? "damageRight"
+              : "damageLeft";
       this.damageUntil = performance.now() + 900;
     }
     if (event.kind === "playerLifeStateChanged" && event.detail === "DOWNED")
       this.audio.play("downed");
     if (event.kind === "reviveCompleted") {
       this.audio.play("reviveComplete");
-      this.feedback = "Teammate revived";
+      this.feedback = { code: "revived" };
       this.feedbackUntil = performance.now() + 1800;
     }
     if (event.kind === "reviveCancelled") {
-      this.feedback = "Revive interrupted";
+      this.feedback = { code: "interrupted" };
       this.feedbackUntil = performance.now() + 1000;
     }
   }
   enter() {
     if (!this.canPlay()) return;
+    this.closeShop();
     this.error = "";
     void this.audio.unlock(this.settings.volume).catch(() => {
-      this.error = "Audio is unavailable. Gameplay remains connected.";
+      this.error = "AUDIO_UNAVAILABLE";
     });
     void this.input.enter();
   }

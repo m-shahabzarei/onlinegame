@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ARENA_BOXES, FALLBACK_SPAWN, TARGETS } from "./arena";
-import { MOVEMENT, RIFLE } from "./config";
+import { MOVEMENT } from "./config";
+import { resolveWeaponStats } from "./phase6";
 import type { MotionState, PlayerInput, Vec3 } from "./protocol";
 
 let initialization: Promise<void> | undefined;
@@ -210,11 +211,16 @@ export class ArenaPhysics {
     this.collider(id, state);
     this.world.step();
   }
-  raycast(origin: Vec3, direction: Vec3, alive: (id: string) => boolean) {
+  raycast(
+    origin: Vec3,
+    direction: Vec3,
+    alive: (id: string) => boolean,
+    range: number = resolveWeaponStats("ar-01", 0).range,
+  ) {
     const ray = new RAPIER.Ray(origin, direction);
     const hit = this.world.castRay(
       ray,
-      RIFLE.range,
+      range,
       true,
       undefined,
       undefined,
@@ -225,7 +231,7 @@ export class ArenaPhysics {
         (!this.targetHandles.has(c.handle) ||
           alive(this.targetHandles.get(c.handle)!)),
     );
-    const distance = hit?.timeOfImpact ?? RIFLE.range;
+    const distance = hit?.timeOfImpact ?? range;
     return {
       point: ray.pointAt(distance),
       targetId: hit

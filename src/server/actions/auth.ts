@@ -1,4 +1,5 @@
 "use server";
+import { actionMessageCode, semanticFieldErrors } from "@/i18n/action-messages";
 
 import { redirect, RedirectType } from "next/navigation";
 
@@ -33,8 +34,7 @@ const unavailableState: ActionState = {
   ok: false,
   error: {
     code: "AUTH_UNAVAILABLE",
-    message:
-      "The account service is temporarily unavailable. Try again shortly.",
+    message: "actionUnavailable",
   },
 };
 
@@ -49,9 +49,9 @@ function mapResult(result: AuthResult<AuthSuccess>): ActionState {
       ok: false,
       error: {
         ...(result.error.code ? { code: result.error.code } : {}),
-        message: result.error.message,
+        message: actionMessageCode(result.error.message, result.error.code),
         ...(result.error.fieldErrors
-          ? { fieldErrors: result.error.fieldErrors }
+          ? { fieldErrors: semanticFieldErrors(result.error.fieldErrors) }
           : {}),
       },
     };
@@ -114,7 +114,7 @@ export async function registerAction(
     await replaceCurrentSession(service, previousToken, result.data);
     return {
       ok: true,
-      message: "Your account is ready.",
+      message: "accountReady",
       data: {
         redirectTo: getSafeInternalPath(formData.get("next"), "/profile"),
       },
@@ -143,7 +143,7 @@ export async function loginAction(
     await replaceCurrentSession(service, previousToken, result.data);
     return {
       ok: true,
-      message: "Signed in successfully.",
+      message: "signedIn",
       data: { redirectTo: getSafeInternalPath(formData.get("next"), "/") },
     };
   } catch {
@@ -165,7 +165,7 @@ export async function guestAction(
     await replaceCurrentSession(service, previousToken, result.data);
     return {
       ok: true,
-      message: "Guest session started.",
+      message: "guestStarted",
       data: { redirectTo: getSafeInternalPath(formData.get("next"), "/") },
     };
   } catch {
@@ -189,8 +189,7 @@ export async function logoutAction(
       ok: false,
       error: {
         code: "AUTH_UNAVAILABLE",
-        message:
-          "We could not revoke this session. You are still signed in on this browser; try again.",
+        message: "logoutFailure",
       },
     };
   }

@@ -1,4 +1,6 @@
 "use client";
+import { actionMessage } from "@/i18n/action-messages";
+import { useLocale, useTranslations } from "@/i18n/provider";
 
 import { LogOut } from "lucide-react";
 import { useActionState, useId } from "react";
@@ -13,6 +15,9 @@ export interface LogoutButtonProps {
 }
 
 export function LogoutButton({ action }: LogoutButtonProps) {
+  const locale = useLocale();
+  const t = useTranslations();
+
   const [state, formAction, pending] = useActionState(
     action,
     initialFormActionState,
@@ -25,12 +30,12 @@ export function LogoutButton({ action }: LogoutButtonProps) {
         type="submit"
         variant="ghost"
         loading={pending}
-        loadingText="Signing out…"
+        loadingText={t("platform.signingOutEllipsis")}
         data-leaves-page
         aria-describedby={state.error?.message ? errorId : undefined}
       >
         <LogOut aria-hidden="true" className="size-4" />
-        Sign out
+        {t("platform.signOut")}
       </Button>
       {state.error?.message ? (
         <p
@@ -38,7 +43,7 @@ export function LogoutButton({ action }: LogoutButtonProps) {
           className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border p-3 text-sm leading-6"
           role="alert"
         >
-          {state.error.message}
+          {actionMessage(locale, state.error.message, state.error.code)}
         </p>
       ) : null}
     </form>

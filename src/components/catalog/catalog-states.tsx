@@ -1,3 +1,7 @@
+"use client";
+import { useLocale, useTranslations } from "@/i18n/provider";
+import { createTranslator } from "@/i18n/client";
+
 import { Compass, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +14,11 @@ import {
 import { cn } from "@/lib/cn";
 
 export function CatalogLoadingGrid({ count = 6 }: { count?: number }) {
+  const t = useTranslations();
+
   return (
     <div
-      aria-label="Loading game catalog"
+      aria-label={t("platform.loadingCatalog")}
       className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3"
       role="status"
     >
@@ -33,17 +39,20 @@ export function CatalogLoadingGrid({ count = 6 }: { count?: number }) {
           </div>
         </div>
       ))}
-      <span className="sr-only">Loading game catalog…</span>
+      <span className="sr-only">{t("platform.loadingCatalogEllipsis")}</span>
     </div>
   );
 }
 
 export function CatalogEmptyState({ className }: { className?: string }) {
+  const locale = useLocale();
+  const t = createTranslator(locale);
+
   return (
     <EmptyState
       className={cn(className)}
-      title="The catalog is quiet"
-      description="No game briefs are available right now. Try again shortly or return to discover when the next signal arrives."
+      title={t("platform.catalogEmpty")}
+      description={t("platform.catalogEmptyHelp")}
       icon={<Compass aria-hidden="true" />}
       action={
         <div className="flex flex-wrap justify-center gap-3">
@@ -52,10 +61,10 @@ export function CatalogEmptyState({ className }: { className?: string }) {
             href="/games"
           >
             <RefreshCcw aria-hidden="true" className="size-4" />
-            Retry catalog
+            {t("platform.retryCatalog")}
           </Link>
           <Link className={buttonVariants({ variant: "ghost" })} href="/">
-            Back to discover
+            {t("platform.backDiscover")}
           </Link>
         </div>
       }
@@ -64,11 +73,14 @@ export function CatalogEmptyState({ className }: { className?: string }) {
 }
 
 export function CatalogErrorState({ onRetry }: { onRetry?: () => void }) {
+  const locale = useLocale();
+  const t = createTranslator(locale);
+
   return (
     <ErrorState
       titleAs="h1"
-      title="Catalog signal lost"
-      description="We could not load the game catalog. Try again, or return to discover while the connection recovers."
+      title={t("platform.catalogError")}
+      description={t("platform.catalogErrorHelp")}
       action={
         <div className="flex flex-wrap justify-center gap-3">
           {onRetry ? (
@@ -78,11 +90,11 @@ export function CatalogErrorState({ onRetry }: { onRetry?: () => void }) {
               onClick={onRetry}
             >
               <RefreshCcw aria-hidden="true" className="size-4" />
-              Try again
+              {t("platform.tryAgain")}
             </button>
           ) : null}
           <Link className={buttonVariants({ variant: "outline" })} href="/">
-            Back to discover
+            {t("platform.backDiscover")}
           </Link>
         </div>
       }

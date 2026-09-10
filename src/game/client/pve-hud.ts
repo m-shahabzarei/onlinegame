@@ -4,6 +4,14 @@ import {
   type PvEMetrics,
   type WaveSnapshot,
 } from "../shared/pve";
+import type { Phase6PlayerState, ShopResultCode } from "../shared/phase6";
+import type { CombatNotice, DamageDirection } from "./messages";
+export interface ShopFeedback {
+  requestId: string;
+  code: ShopResultCode;
+  weaponId?: string | undefined;
+  kind?: "weapon" | "ammo" | "upgrade" | "equip" | undefined;
+}
 export interface PvEHud {
   wave: WaveSnapshot;
   life: LifeState;
@@ -16,8 +24,13 @@ export interface PvEHud {
   reviveProgress: number;
   reviving: boolean;
   recoveryPending: boolean;
-  feedback: string;
-  damageDirection: string;
+  feedback: CombatNotice | null;
+  damageDirection: DamageDirection | null;
+  shopVisible: boolean;
+  shopSeconds: number;
+  shopFeedback: ShopFeedback | null;
+  shopPending: boolean;
+  loadout: Phase6PlayerState | null;
   pooledZombies: number;
   activeZombies: number;
   zombieCorrections: number;
@@ -53,8 +66,13 @@ export const INITIAL_PVE_HUD: PvEHud = {
   reviveProgress: 0,
   reviving: false,
   recoveryPending: false,
-  feedback: "",
-  damageDirection: "",
+  feedback: null,
+  damageDirection: null,
+  shopVisible: false,
+  shopSeconds: 0,
+  shopFeedback: null,
+  shopPending: false,
+  loadout: null,
   pooledZombies: 48,
   activeZombies: 0,
   zombieCorrections: 0,

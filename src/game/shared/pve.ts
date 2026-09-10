@@ -185,7 +185,7 @@ export const outcomeSchema = z
   .object({
     result: z.enum(["PHASE_COMPLETE", "TEAM_DEFEATED"]),
     reason: z.string().max(120),
-    completedWaves: z.number().int().min(0).max(5),
+    completedWaves: z.number().int().min(0).max(10),
   })
   .strict();
 export type PvEOutcome = z.infer<typeof outcomeSchema>;

@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
-import localFont from "next/font/local";
+import { persianFont } from "@/i18n/font";
 import { getRequestLocale, translate } from "@/i18n";
+import { LocaleProvider } from "@/i18n/provider";
+import { localeDirection } from "@/i18n/core";
 
 import "./globals.css";
 
@@ -23,17 +25,6 @@ const monoFont = Geist_Mono({
   display: "swap",
 });
 
-const persianFont = localFont({
-  src: [
-    { path: "../../fonts/Vazir-Light.woff2", weight: "300", style: "normal" },
-    { path: "../../fonts/Vazir.woff2", weight: "400", style: "normal" },
-    { path: "../../fonts/Vazir-Medium.woff2", weight: "500", style: "normal" },
-    { path: "../../fonts/Vazir-Bold.woff2", weight: "700", style: "normal" },
-  ],
-  variable: "--font-vazirmatn",
-  display: "swap",
-});
-
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
   return {
@@ -43,7 +34,11 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: translate(locale, "metadata.description"),
     applicationName: translate(locale, "metadata.title"),
-    keywords: ["cooperative games", "two-player games", "gaming platform"],
+    keywords: [
+      translate(locale, "pages.cooperativeGames"),
+      translate(locale, "pages.twoPlayerGames"),
+      translate(locale, "pages.gamingPlatform"),
+    ],
   };
 }
 
@@ -61,7 +56,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      dir={locale === "fa" ? "rtl" : "ltr"}
+      dir={localeDirection[locale]}
       data-locale={locale}
       className="dark"
       data-scroll-behavior="smooth"
@@ -72,7 +67,7 @@ export default async function RootLayout({
         <a className="skip-link" href="#main-content">
           {translate(locale, "navigation.skipToContent")}
         </a>
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
       </body>
     </html>
   );

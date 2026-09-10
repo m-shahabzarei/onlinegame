@@ -3,6 +3,8 @@ import { performance } from "node:perf_hooks";
 import { initPhysics } from "../dist/game-server/src/game/shared/physics.js";
 import { MatchInstance } from "../dist/game-server/services/game-server/match.js";
 import { neutralInput } from "../dist/game-server/src/game/shared/protocol.js";
+import { PROTOCOL_VERSION } from "../dist/game-server/src/game/shared/config.js";
+import { resolveWeaponStats } from "../dist/game-server/src/game/shared/phase6.js";
 import { tokenTimes } from "../dist/game-server/src/game/shared/tokens.js";
 import { WAVES } from "../dist/game-server/services/game-server/pve/waves.js";
 import { ZOMBIES } from "../dist/game-server/services/game-server/pve/definitions.js";
@@ -61,7 +63,7 @@ reservation.players.forEach((p, i) =>
 );
 reservation.players.forEach((p, i) =>
   match.command(p.playerId, peers[i], {
-    v: 2,
+    v: PROTOCOL_VERSION,
     type: "clientReady",
     mapId: "quarantine-yard",
     mapVersion: 2,
@@ -107,7 +109,12 @@ try {
     for (const p of match.players) {
       p.state.health = 100;
       p.state.life = "ALIVE";
-      p.state.weapon.reserve = 120;
+      const loadout = match.phase6.players.get(p.state.id);
+      const stats = resolveWeaponStats(
+        loadout.equippedWeapon,
+        loadout.upgrades[loadout.equippedWeapon] ?? 0,
+      );
+      p.state.weapon.reserve = stats.reserveCapacity;
     }
     const start = performance.now(),
       beforePaths = match.pve.navigation.requests;
@@ -119,12 +126,18 @@ try {
       });
       const target = match.pve.entities.entities.find((z) => z.health > 0);
       if (target && i % 6 === slot) {
-        if (!p.weapon.magazine) p.weapon.magazine = 30;
+        const loadout = match.phase6.players.get(p.id);
+        const stats = resolveWeaponStats(
+          loadout.equippedWeapon,
+          loadout.upgrades[loadout.equippedWeapon] ?? 0,
+        );
+        if (!p.weapon.magazine) p.weapon.magazine = stats.magazineCapacity;
         const dx = target.position.x - p.position.x,
           dz = target.position.z - p.position.z;
         match.command(p.id, peers[slot], {
-          v: 2,
+          v: PROTOCOL_VERSION,
           type: "fire",
+          triggerSeq: 1,
           seq: ++shotSeq[slot],
           tick: match.tick,
           viewTick: Math.max(0, match.tick - 3),

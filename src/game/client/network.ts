@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LIMITS } from "../shared/config";
+import type { RuntimeErrorCode } from "./messages";
 import {
   serverMessageSchema,
   type ClientMessage,
@@ -36,7 +37,10 @@ export class GameplayNetwork {
   constructor(
     readonly matchId: string,
     readonly receive: (message: ServerMessage) => void,
-    readonly changed: (state: ConnectionState, error: string) => void,
+    readonly changed: (
+      state: ConnectionState,
+      error: RuntimeErrorCode | "",
+    ) => void,
   ) {
     this.heartbeat = setInterval(() => {
       if (this.socket?.readyState !== WebSocket.OPEN) return;
@@ -44,10 +48,10 @@ export class GameplayNetwork {
         this.socket.close();
         return;
       }
-      this.send({ v: 2, type: "ping", sentAt: Date.now() });
+      this.send({ v: 3, type: "ping", sentAt: Date.now() });
     }, LIMITS.heartbeatMs);
   }
-  private setState(state: ConnectionState, error = "") {
+  private setState(state: ConnectionState, error: RuntimeErrorCode | "" = "") {
     this.state = state;
     this.changed(state, error);
   }
@@ -75,14 +79,10 @@ export class GameplayNetwork {
         if (response.status === 403 || response.status === 410) {
           this.terminal = true;
           throw new Error(
-            response.status === 403
-              ? "Your session cannot enter this match. Return to rooms to sign in again."
-              : "This training session has ended. Return to rooms to reserve another match.",
+            response.status === 403 ? "UNAUTHORIZED" : "MATCH_UNAVAILABLE",
           );
         }
-        throw new Error(
-          "The gameplay service is unavailable. Retry or return to rooms.",
-        );
+        throw new Error("SERVER_UNAVAILABLE");
       }
       const bootstrap = bootstrapSchema.parse(await response.json()).data;
       if (this.disposed || generation !== this.generation) return;
@@ -91,7 +91,7 @@ export class GameplayNetwork {
         !["ws:", "wss:"].includes(url.protocol) ||
         (location.protocol === "https:" && url.protocol !== "wss:")
       )
-        throw new Error("The gameplay connection is not configured securely.");
+        throw new Error("INSECURE_CONNECTION");
       const socket = new WebSocket(url);
       this.socket = socket;
       this.lastMessageAt = Date.now();
@@ -103,13 +103,13 @@ export class GameplayNetwork {
           socket.close();
           return;
         }
-        this.send({ v: 2, type: "join", token: bootstrap.token });
+        this.send({ v: 3, type: "join", token: bootstrap.token });
       };
       socket.onmessage = (event) => {
         if (this.disposed || generation !== this.generation) return;
         try {
           if (typeof event.data !== "string" || event.data.length > 32768)
-            throw new Error("Invalid server frame");
+            throw new Error("INVALID_SERVER_FRAME");
           this.inbound++;
           this.inboundBytes += new TextEncoder().encode(event.data).length;
           const message = serverMessageSchema.parse(JSON.parse(event.data));
@@ -134,8 +134,8 @@ export class GameplayNetwork {
             ].includes(message.code);
             const error =
               message.code === "SLOT_CONNECTED"
-                ? "This player is already connected in another tab. Close it, then retry."
-                : "The server rejected this connection. Retry or return to rooms.";
+                ? "SLOT_CONNECTED"
+                : "CONNECTION_REJECTED";
             this.setState("Failed", error);
             socket.close();
             return;
@@ -143,10 +143,7 @@ export class GameplayNetwork {
           this.receive(message);
         } catch {
           this.terminal = true;
-          this.setState(
-            "Failed",
-            "The server protocol is incompatible. Reload the page.",
-          );
+          this.setState("Failed", "PROTOCOL_MISMATCH");
           socket.close();
         }
       };
@@ -162,7 +159,9 @@ export class GameplayNetwork {
       if (this.terminal)
         this.setState(
           "Failed",
-          error instanceof Error ? error.message : "Cannot connect.",
+          error instanceof Error && error.message === "UNAUTHORIZED"
+            ? "UNAUTHORIZED"
+            : "MATCH_UNAVAILABLE",
         );
       else this.schedule();
     }
@@ -170,13 +169,10 @@ export class GameplayNetwork {
   private schedule() {
     if (this.disposed) return;
     if (this.attempts >= 6) {
-      this.setState(
-        "Failed",
-        "Connection recovery timed out. Retry during the match grace period, or return to rooms.",
-      );
+      this.setState("Failed", "RECOVERY_TIMEOUT");
       return;
     }
-    this.setState("Reconnecting", "Reconnecting to your existing player slot…");
+    this.setState("Reconnecting", "RECONNECTING");
     const delay =
       Math.min(8000, 500 * 2 ** this.attempts++) + Math.random() * 200;
     this.retryTimer = setTimeout(() => void this.connect(), delay);
@@ -207,7 +203,7 @@ export class GameplayNetwork {
     return Date.now() + this.serverOffset;
   }
   async leave() {
-    this.send({ v: 2, type: "leaveMatch" });
+    this.send({ v: 3, type: "leaveMatch" });
     const cleanupRequest = new AbortController();
     const timeout = setTimeout(() => cleanupRequest.abort(), 5000);
     try {

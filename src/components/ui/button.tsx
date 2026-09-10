@@ -1,3 +1,5 @@
+import { LocalizedLoading } from "./localized-loading";
+
 import { cva, type VariantProps } from "class-variance-authority";
 import { LoaderCircle } from "lucide-react";
 import * as React from "react";
@@ -58,7 +60,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    const statusText = loadingText ?? "Loading";
+    const statusText = loadingText ?? <LocalizedLoading />;
 
     return (
       <button

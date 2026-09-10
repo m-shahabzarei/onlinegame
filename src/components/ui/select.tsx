@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "@/i18n/provider";
 
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp, CircleAlert } from "lucide-react";
@@ -39,11 +40,13 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       id,
       label,
       options,
-      placeholder = "Select an option",
+      placeholder,
       ...rootProps
     },
     ref,
   ) => {
+    const t = useTranslations();
+
     const generatedId = React.useId();
     const triggerId = id ?? generatedId;
     const descriptionId = `${triggerId}-description`;
@@ -79,7 +82,9 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
               className,
             )}
           >
-            <SelectPrimitive.Value placeholder={placeholder} />
+            <SelectPrimitive.Value
+              placeholder={placeholder ?? t("platform.selectOption")}
+            />
             <SelectPrimitive.Icon asChild>
               <ChevronDown
                 aria-hidden="true"

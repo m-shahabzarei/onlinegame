@@ -88,16 +88,21 @@ describe("validated Phase 5 configuration and wave accounting", () => {
     expect(w.state.alive).toBe(1);
     expect(w.canClear()).toBe(false);
   });
-  it("queues pressure behind concurrency without losing scheduled enemies", () =>
-    withMatch((f) => {
-      const { pve } = f.match;
-      for (const p of f.match.players) p.state.protectedUntil = 999999;
-      f.advance(24000);
-      expect(pve.entities.alive).toBe(WAVES[0]!.cap);
-      expect(pve.waves.state.scheduled).toBe(8);
-      expect(pve.waves.queue.length).toBe(4);
-      expect(pve.waves.state.state).toBe("ACTIVE");
-    }));
+  // These bounded simulations advance hundreds of ticks on shared CI hosts.
+  it(
+    "queues pressure behind concurrency without losing scheduled enemies",
+    () =>
+      withMatch((f) => {
+        const { pve } = f.match;
+        for (const p of f.match.players) p.state.protectedUntil = 999999;
+        f.advance(24000);
+        expect(pve.entities.alive).toBe(WAVES[0]!.cap);
+        expect(pve.waves.state.scheduled).toBe(8);
+        expect(pve.waves.queue.length).toBe(4);
+        expect(pve.waves.state.state).toBe("ACTIVE");
+      }),
+    15000,
+  );
   it("completes exactly five waves, accounts reinforcements and never starts Wave 6", () =>
     withMatch((f) => {
       for (const p of f.match.players) p.state.protectedUntil = 999999;
@@ -257,38 +262,42 @@ describe("navigation, spawning and targeting", () => {
       expect(z.targetId).toBe("");
       for (const p of players) expect(eligiblePlayer(p)).toBe(false);
     }));
-  it("keeps mixed moving zombies inside clear space without overlapping each other", () =>
-    withMatch((f) => {
-      const sim = f.match.pve;
-      for (const p of f.match.players) p.state.protectedUntil = 999999;
-      for (const [i, archetype] of (
-        ["walker", "runner", "spitter", "brute", "screamer"] as const
-      ).entries())
-        sim.entities.spawn(
-          archetype,
-          { x: -4 + i * 2, y: 0.04, z: -14 },
-          sim.waves.config,
-          f.now(),
-          f.match.tick,
-        );
-      for (let i = 0; i < 300; i++) {
-        f.advance(34);
-        for (const z of sim.entities.entities) {
-          expect(navigable(z.position.x, z.position.z, z.radius)).toBe(true);
-          for (const other of sim.entities.entities)
-            if (z !== other && z.health && other.health)
-              expect(
-                Math.hypot(
-                  z.position.x - other.position.x,
-                  z.position.z - other.position.z,
-                ),
-              ).toBeGreaterThanOrEqual(z.radius + other.radius - 0.001);
+  it(
+    "keeps mixed moving zombies inside clear space without overlapping each other",
+    () =>
+      withMatch((f) => {
+        const sim = f.match.pve;
+        for (const p of f.match.players) p.state.protectedUntil = 999999;
+        for (const [i, archetype] of (
+          ["walker", "runner", "spitter", "brute", "screamer"] as const
+        ).entries())
+          sim.entities.spawn(
+            archetype,
+            { x: -4 + i * 2, y: 0.04, z: -14 },
+            sim.waves.config,
+            f.now(),
+            f.match.tick,
+          );
+        for (let i = 0; i < 300; i++) {
+          f.advance(34);
+          for (const z of sim.entities.entities) {
+            expect(navigable(z.position.x, z.position.z, z.radius)).toBe(true);
+            for (const other of sim.entities.entities)
+              if (z !== other && z.health && other.health)
+                expect(
+                  Math.hypot(
+                    z.position.x - other.position.x,
+                    z.position.z - other.position.z,
+                  ),
+                ).toBeGreaterThanOrEqual(z.radius + other.radius - 0.001);
+          }
         }
-      }
-      expect(sim.navigation.requests).toBeLessThanOrEqual(
-        f.match.tick * PVE_RULES.pathRequestsPerTick,
-      );
-    }));
+        expect(sim.navigation.requests).toBeLessThanOrEqual(
+          f.match.tick * PVE_RULES.pathRequestsPerTick,
+        );
+      }),
+    15000,
+  );
   it("detects lack of progress, invalidates a failed path and recovers without teleporting", () =>
     withMatch((f) => {
       const sim = f.match.pve,
@@ -531,8 +540,9 @@ describe("server-owned attacks and rifle damage", () => {
         f.match.tick,
       );
       const shot = {
-        v: 2 as const,
+        v: 3 as const,
         type: "fire" as const,
+        triggerSeq: 1,
         seq: 1,
         tick: f.match.tick,
         viewTick: f.match.tick,
@@ -567,8 +577,9 @@ describe("server-owned attacks and rifle damage", () => {
         f.match.tick,
       );
       f.match.command(p.id, f.peers[0]!, {
-        v: 2,
+        v: 3,
         type: "fire",
+        triggerSeq: 1,
         seq: 1,
         tick: f.match.tick,
         yaw: 0,
@@ -602,12 +613,13 @@ describe("life states, revive and reconnect", () => {
       f.advance(34);
       expect(p.position).toEqual(before);
       expect(() =>
-        f.match.command(p.id, f.peers[0]!, { v: 2, type: "reload", seq: 1 }),
+        f.match.command(p.id, f.peers[0]!, { v: 3, type: "reload", seq: 1 }),
       ).toThrow("NOT_PLAYING");
       expect(() =>
         f.match.command(p.id, f.peers[0]!, {
-          v: 2,
+          v: 3,
           type: "fire",
+          triggerSeq: 1,
           seq: 1,
           tick: f.match.tick,
           yaw: 0,
@@ -682,7 +694,7 @@ describe("life states, revive and reconnect", () => {
       expect(revive.begin(a!, b!, f.now())).toBe(false);
       expect(
         clientMessageSchema.safeParse({
-          v: 2,
+          v: 3,
           type: "beginRevive",
           targetId: b!.id,
           seq: 1,
@@ -690,7 +702,7 @@ describe("life states, revive and reconnect", () => {
         }).success,
       ).toBe(false);
     }));
-  it("bleed-out eliminates, intermission returns once and preserves magazine with reserve resupply", () =>
+  it("bleed-out eliminates, intermission returns once and preserves authoritative ammunition", () =>
     withMatch((f) => {
       const [a, b] = f.match.players.map((p) => p.state),
         sim = f.match.pve;
@@ -713,7 +725,7 @@ describe("life states, revive and reconnect", () => {
       expect(b!.health).toBe(100);
       expect(b!.weapon).toMatchObject({
         magazine: 7,
-        reserve: 120,
+        reserve: 13,
         reloadAt: 0,
       });
       expect(

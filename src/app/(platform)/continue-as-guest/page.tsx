@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
-
 import { GuestForm } from "@/components/forms";
 import { getSafeInternalPath } from "@/lib/safe-internal-path";
 import { guestAction } from "@/server/actions/auth";
-import { getRequestLocale } from "@/i18n";
+import { getRequestLocale, createTranslator } from "@/i18n";
 
-export const metadata: Metadata = {
-  title: "Continue as guest",
-  description: "Explore TwoPlayer with a temporary guest identity.",
-};
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.continueAsGuest"),
+    description: t("pages.exploreTwoPlayerWithATemporaryGuestIdentity"),
+  };
+}
 
 interface GuestPageProps {
   readonly searchParams?: Promise<

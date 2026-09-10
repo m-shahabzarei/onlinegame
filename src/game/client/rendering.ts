@@ -10,6 +10,8 @@ import type {
 } from "../shared/protocol";
 import type { GameSettings } from "../shared/settings";
 import { ZombieRenderer } from "./zombies";
+import { WEAPONS, type WeaponDefinition } from "../shared/phase6";
+import type { ArenaPresentation } from "./messages";
 interface Effect {
   line: THREE.Line;
   impact: THREE.Mesh;
@@ -38,6 +40,12 @@ export class ArenaRenderer {
     red: new THREE.MeshBasicMaterial({ color: 0xef647b }),
   };
   private weapon = new THREE.Group();
+  private models = new Map<string, THREE.Group>();
+  private remoteModels = new Map<string, THREE.Group>();
+  private activeWeapon = "ar-01";
+  private labels: ArenaPresentation | undefined;
+  private signs: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }[] =
+    [];
   private flash: THREE.Mesh;
   private recoil = 0;
   private muzzleUntil = 0;
@@ -57,7 +65,9 @@ export class ArenaRenderer {
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly contextChanged: (lost: boolean) => void,
+    presentation?: ArenaPresentation,
   ) {
+    this.labels = presentation;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -123,42 +133,93 @@ export class ArenaRenderer {
       ring.position.set(t.position.x, t.position.y, t.position.z + 0.16);
       this.scene.add(ring);
     }
-    this.sign("QUARANTINE / 05", -7.5, 4.3, -19.5, 8, 1.2);
-    this.sign("NORTH / CONTAINMENT", 7.5, 4.3, -19.5, 7, 1.2);
-    this.sign("LIVE HOSTILES / STAY TOGETHER", 0, 3.1, -6.63, 4, 0.65);
+    this.sign(presentation?.signs[0] ?? "", -7.5, 4.3, -19.5, 8, 1.2);
+    this.sign(presentation?.signs[1] ?? "", 7.5, 4.3, -19.5, 7, 1.2);
+    this.sign(presentation?.signs[2] ?? "", 0, 3.1, -6.63, 4, 0.65);
     this.camera.add(this.weapon);
     this.weapon.position.set(0.28, -0.26, -0.48);
-    this.localBox(this.weapon, 0, 0, 0, 0.12, 0.14, 0.43, this.materials.steel);
-    this.localBox(
-      this.weapon,
-      0,
-      -0.14,
-      0.06,
-      0.07,
-      0.2,
-      0.1,
-      this.materials.concrete,
-    );
-    this.localBox(
-      this.weapon,
-      0,
-      0,
-      -0.3,
-      0.05,
-      0.05,
-      0.25,
-      this.materials.concrete,
-    );
-    this.localBox(
-      this.weapon,
-      0,
-      0.09,
-      -0.04,
-      0.04,
-      0.04,
-      0.12,
-      this.materials.concrete,
-    );
+    // Construct once, switch visibility only. All five models share box buffers.
+    for (const definition of WEAPONS) {
+      const model = new THREE.Group();
+      const pistol = definition.slot === "secondary",
+        heavy = definition.ammoType === "heavy",
+        shotgun = definition.ammoType === "shell",
+        smg = definition.ammoType === "smg";
+      const length = pistol
+        ? 0.23
+        : heavy
+          ? 0.61
+          : shotgun
+            ? 0.52
+            : smg
+              ? 0.32
+              : 0.43;
+      this.localBox(
+        model,
+        0,
+        0,
+        0,
+        shotgun ? 0.17 : 0.12,
+        pistol ? 0.1 : 0.14,
+        length,
+        this.materials.steel,
+      );
+      this.localBox(
+        model,
+        0,
+        -0.13,
+        0.06,
+        0.07,
+        smg ? 0.29 : 0.2,
+        0.1,
+        this.materials.concrete,
+      );
+      this.localBox(
+        model,
+        0,
+        0,
+        -length / 2 - 0.09,
+        shotgun ? 0.085 : 0.05,
+        shotgun ? 0.085 : 0.05,
+        pistol ? 0.06 : 0.25,
+        this.materials.concrete,
+      );
+      this.localBox(
+        model,
+        0,
+        0.09,
+        -0.04,
+        heavy ? 0.065 : 0.04,
+        heavy ? 0.075 : 0.04,
+        heavy ? 0.27 : 0.12,
+        this.materials.concrete,
+      );
+      if (shotgun)
+        this.localBox(
+          model,
+          0,
+          -0.06,
+          -0.26,
+          0.13,
+          0.09,
+          0.18,
+          this.materials.crate,
+        );
+      if (smg)
+        this.localBox(
+          model,
+          0,
+          0.11,
+          0.04,
+          0.1,
+          0.035,
+          0.22,
+          this.materials.blue,
+        );
+      model.visible = definition.id === this.activeWeapon;
+      this.models.set(definition.id, model);
+      this.weapon.add(model);
+    }
     this.flash = new THREE.Mesh(
       new THREE.ConeGeometry(0.06, 0.16, 5),
       new THREE.MeshBasicMaterial({ color: 0xffdba0 }),
@@ -202,16 +263,12 @@ export class ArenaRenderer {
     }
     this.remoteAim.position.set(0.28, 1.25, -0.1);
     this.remote.add(this.remoteAim);
-    this.localBox(
-      this.remoteAim,
-      0,
-      0,
-      -0.25,
-      0.1,
-      0.1,
-      0.6,
-      this.materials.steel,
-    );
+    for (const [id, model] of this.models) {
+      const remoteModel = model.clone(true);
+      remoteModel.position.z = -0.15;
+      this.remoteModels.set(id, remoteModel);
+      this.remoteAim.add(remoteModel);
+    }
     this.localBox(this.remoteAim, -0.18, 0, 0, 0.32, 0.13, 0.15, bodyMaterial);
     this.labelCanvas.width = 512;
     this.labelCanvas.height = 80;
@@ -305,10 +362,11 @@ export class ArenaRenderer {
     ctx.fillStyle = "#17222f";
     ctx.fillRect(0, 0, 1024, 160);
     ctx.fillStyle = "#d4e7f4";
-    ctx.font = "bold 58px sans-serif";
+    ctx.font = `bold 58px ${getComputedStyle(this.canvas).fontFamily}`;
     ctx.textAlign = "center";
     ctx.fillText(text, 512, 103);
     const map = new THREE.CanvasTexture(canvas);
+    this.signs.push({ canvas, texture: map });
     map.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
@@ -327,22 +385,76 @@ export class ArenaRenderer {
     this.camera.updateProjectionMatrix();
   }
   async prepare() {
+    await document.fonts?.ready;
+    if (this.labels) this.presentation(this.labels);
     await this.renderer.compileAsync(this.scene, this.camera);
   }
-  localShot() {
-    this.muzzleUntil = performance.now() + 55;
-    this.recoil = Math.min(1, this.recoil + 0.8);
+  presentation(labels: ArenaPresentation) {
+    this.labels = labels;
+    this.labelText = "";
+    this.zombies.presentation(
+      labels.zombieLabels,
+      getComputedStyle(this.canvas).fontFamily,
+    );
+    this.signs.forEach(({ canvas, texture }, i) => {
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#17222f";
+      ctx.fillRect(0, 0, 1024, 160);
+      ctx.fillStyle = "#d4e7f4";
+      ctx.font = `bold 58px ${getComputedStyle(this.canvas).fontFamily}`;
+      ctx.textAlign = "center";
+      ctx.fillText(labels.signs[i] ?? "", 512, 103, 980);
+      texture.needsUpdate = true;
+    });
+  }
+  equip(stats: WeaponDefinition) {
+    this.activeWeapon = stats.id;
+    for (const [id, model] of this.models) model.visible = id === stats.id;
+    this.recoil = 0;
+    this.muzzleUntil = 0;
+    this.flash.position.z =
+      stats.slot === "secondary"
+        ? -0.23
+        : stats.ammoType === "heavy"
+          ? -0.55
+          : -0.47;
+    this.flash.scale.setScalar(
+      stats.muzzleEffect === "muzzle-shotgun"
+        ? 1.8
+        : stats.muzzleEffect === "muzzle-pistol"
+          ? 0.65
+          : 1,
+    );
+    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(
+      stats.ammoType === "heavy"
+        ? 0xffa45b
+        : stats.ammoType === "smg"
+          ? 0xfff0bf
+          : 0xffdba0,
+    );
+  }
+  remoteWeapon(id: string) {
+    for (const [weaponId, model] of this.remoteModels)
+      model.visible = weaponId === id;
+  }
+  localShot(stats: WeaponDefinition) {
+    this.muzzleUntil =
+      performance.now() + (stats.fireMode === "pump" ? 85 : 45);
+    this.recoil = Math.min(2.5, this.recoil + stats.recoil * 6);
   }
   remoteShot() {
     this.remoteFireUntil = performance.now() + 180;
   }
-  impact(origin: Vec3, point: Vec3, flashes: boolean) {
+  impact(origin: Vec3, point: Vec3, flashes: boolean, effect = "spark") {
     const e = this.effects[this.effectIndex++ % this.effects.length]!;
     e.positions.set([origin.x, origin.y, origin.z, point.x, point.y, point.z]);
     e.line.geometry.attributes.position!.needsUpdate = true;
     e.line.visible = flashes;
     e.impact.position.set(point.x, point.y, point.z);
     e.impact.visible = true;
+    e.impact.scale.setScalar(
+      effect === "impact-heavy" ? 2.2 : effect === "metal-spark" ? 1.3 : 1,
+    );
     e.until = performance.now() + 220;
   }
   updateTargets(targets: TargetState[]) {
@@ -379,7 +491,7 @@ export class ArenaRenderer {
     this.legs[0]!.rotation.x = stride;
     this.legs[1]!.rotation.x = -stride;
     this.remoteAim.position.z = time < this.remoteFireUntil ? -0.04 : -0.1;
-    const text = `${state.name} · ${!state.connected ? "Reconnecting" : state.life === "DOWNED" ? "DOWNED · Hold E to revive" : `${state.health} HP`}`;
+    const text = this.labels?.teammateLabel(state) ?? state.name;
     if (text !== this.labelText) {
       this.labelText = text;
       const ctx = this.labelCanvas.getContext("2d")!;
@@ -387,9 +499,9 @@ export class ArenaRenderer {
       ctx.fillStyle = "rgba(7,9,18,0.92)";
       ctx.fillRect(0, 0, 512, 80);
       ctx.fillStyle = "#f1f3ff";
-      ctx.font = "26px sans-serif";
+      ctx.font = `26px ${getComputedStyle(this.canvas).fontFamily}`;
       ctx.textAlign = "center";
-      ctx.fillText(text.slice(0, 42), 256, 49);
+      ctx.fillText(text, 256, 49, 490);
       this.labelTexture.needsUpdate = true;
     }
   }

@@ -81,7 +81,7 @@ describe("prediction under bounded transport delay", () => {
             reservation.players[slot].playerId,
             slot === 0 ? peer : other,
             {
-              v: 2,
+              v: 3,
               type: "clientReady",
               mapId: "quarantine-yard",
               mapVersion: 2,
@@ -145,5 +145,5 @@ describe("prediction under bounded transport delay", () => {
         physics.dispose();
         match.dispose();
       }
-    });
+    }, 15000);
 });

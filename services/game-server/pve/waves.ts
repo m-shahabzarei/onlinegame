@@ -196,7 +196,13 @@ const transitions: Record<WaveState, readonly WaveState[]> = {
     "CANCELLED",
     "ERROR",
   ],
-  INTERMISSION: ["ACTIVE", "TEAM_DEFEATED", "CANCELLED", "ERROR"],
+  INTERMISSION: [
+    "ACTIVE",
+    "PHASE_COMPLETE",
+    "TEAM_DEFEATED",
+    "CANCELLED",
+    "ERROR",
+  ],
   PHASE_COMPLETE: [],
   TEAM_DEFEATED: [],
   CANCELLED: [],
@@ -211,6 +217,7 @@ export class WaveDirector {
     readonly random: () => number,
     readonly changed: (wave: WaveSnapshot) => void,
     readonly configs: readonly WaveConfig[] = WAVES,
+    readonly finalIntermission = false,
   ) {
     validateWaves(configs);
     this.state.total = configs.length as 5 | 10;
@@ -290,7 +297,9 @@ export class WaveDirector {
         this.state.state === "INTERMISSION") &&
       now >= this.state.until
     )
-      this.start(now);
+      if (this.state.number === this.configs.length)
+        this.change("PHASE_COMPLETE");
+      else this.start(now);
     if (this.state.state !== "ACTIVE" && this.state.state !== "CLEARING")
       return;
     if (this.state.scheduled < this.plan.length && now >= this.nextSchedule) {
@@ -309,10 +318,10 @@ export class WaveDirector {
       this.change("CLEARING");
     if (this.state.state === "CLEARING" && this.canClear()) {
       this.change(
-        this.state.number === this.configs.length
+        this.state.number === this.configs.length && !this.finalIntermission
           ? "PHASE_COMPLETE"
           : "INTERMISSION",
-        this.state.number === this.configs.length
+        this.state.number === this.configs.length && !this.finalIntermission
           ? 0
           : now + this.config.intermissionMs,
       );

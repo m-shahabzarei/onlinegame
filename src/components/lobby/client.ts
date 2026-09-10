@@ -41,6 +41,4 @@ export async function lobbyRequest<T>(
 export const sendLobbyCommand = (command: LobbyCommand) =>
   lobbyRequest<CommandResult>({ op: "command" }, command);
 export const errorMessage = (error: unknown) =>
-  error instanceof LobbyError
-    ? error.message
-    : "Connection interrupted. Your input is saved; try again.";
+  error instanceof LobbyError ? error.code : "CONNECTION_INTERRUPTED";

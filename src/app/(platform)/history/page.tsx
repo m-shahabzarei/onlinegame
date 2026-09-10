@@ -1,4 +1,10 @@
-import type { Metadata } from "next";
+import { catalogCopy } from "@/i18n/catalog";
+import {
+  getRequestLocale,
+  createTranslator,
+  formatNumber,
+  formatDate,
+} from "@/i18n";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,12 +17,19 @@ import {
 import { getStrictCurrentSession } from "@/server/dal/session";
 import { phase8Service } from "@/server/phase8/service";
 
-export const metadata: Metadata = {
-  title: "Match history",
-  description: "Review your completed TwoPlayer runs.",
-};
+export async function generateMetadata() {
+  const locale = await getRequestLocale();
+  const t = createTranslator(locale);
+  return {
+    title: t("pages.matchHistory"),
+    description: t("pages.reviewYourCompletedTwoPlayerRuns"),
+  };
+}
 
 export default async function HistoryPage() {
+  const locale = await getRequestLocale();
+  const t = createTranslator(locale);
+
   const session = await getStrictCurrentSession();
   if (!session) redirect("/login?next=/history");
   let history;
@@ -29,26 +42,27 @@ export default async function HistoryPage() {
     <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div>
         <p className="text-primary font-mono text-xs font-semibold tracking-[0.2em] uppercase">
-          Your runs
+          {t("pages.yourRuns")}
         </p>
         <h1 className="font-display text-foreground mt-2 text-3xl font-semibold sm:text-4xl">
-          Match history
+          {t("pages.matchHistory")}
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl leading-7">
-          Only your authorized match summaries appear here. High-frequency
-          gameplay state is never stored in this view.
+          {t(
+            "pages.onlyYourAuthorizedMatchSummariesAppearHereHighfrequencyGameplay",
+          )}
         </p>
       </div>
       {history.items.length === 0 ? (
         <EmptyState
-          title="No completed runs yet"
-          description="Finish a cooperative run and its summary will appear here."
+          title={t("pages.noCompletedRunsYet")}
+          description={t("pages.finishACooperativeRunAndItsSummaryWillAppear")}
           action={
             <Link
               className="text-primary font-semibold underline-offset-4 hover:underline"
               href="/games"
             >
-              Choose a game
+              {t("pages.chooseAGame")}
             </Link>
           }
         />
@@ -58,7 +72,9 @@ export default async function HistoryPage() {
             <Card key={item.id}>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle as="h2">{item.game.name}</CardTitle>
+                  <CardTitle as="h2">
+                    {catalogCopy(locale, item.game.slug).name}
+                  </CardTitle>
                   <span
                     className={
                       item.result === "VICTORY" ||
@@ -68,14 +84,14 @@ export default async function HistoryPage() {
                     }
                   >
                     {item.result === "VICTORY"
-                      ? "Victory"
+                      ? t("pages.victory")
                       : item.result === "PHASE_COMPLETE"
-                        ? "Complete"
-                        : "Defeat"}
+                        ? t("pages.complete")
+                        : t("pages.defeat")}
                   </span>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  {item.createdAt.toLocaleString("en", {
+                  {formatDate(locale, item.createdAt, {
                     dateStyle: "medium",
                     timeStyle: "short",
                   })}
@@ -83,22 +99,28 @@ export default async function HistoryPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block">Waves</span>
-                  <strong>{item.completedWaves}</strong>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Score</span>
-                  <strong>{item.score}</strong>
+                  <span className="text-muted-foreground block">
+                    {t("pages.waves")}
+                  </span>
+                  <strong>{formatNumber(locale, item.completedWaves)}</strong>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">
-                    Contribution
+                    {t("pages.score")}
                   </span>
-                  <strong>{item.contribution}</strong>
+                  <strong>{formatNumber(locale, item.score)}</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block">Revives</span>
-                  <strong>{item.revives}</strong>
+                  <span className="text-muted-foreground block">
+                    {t("pages.contribution")}
+                  </span>
+                  <strong>{formatNumber(locale, item.contribution)}</strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">
+                    {t("pages.revives")}
+                  </span>
+                  <strong>{formatNumber(locale, item.revives)}</strong>
                 </div>
               </CardContent>
             </Card>

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_PROFILES, FINAL_BOSS, emptyPhase6Player, resolveWeaponStats, spendScrap, addScrap } from "./phase6";
+import {
+  CONTENT_PROFILES,
+  FINAL_BOSS,
+  emptyPhase6Player,
+  resolveWeaponStats,
+  spendScrap,
+  addScrap,
+} from "./phase6";
 import { parseClientMessage, serverMessageSchema } from "./protocol";
 
 describe("Phase 6 content and economy", () => {
@@ -25,7 +32,35 @@ describe("Phase 6 content and economy", () => {
     expect(FINAL_BOSS.phases[1]!.threshold).toBeLessThan(1);
   });
   it("parses versioned purchase intents and authoritative state events", () => {
-    expect(parseClientMessage(JSON.stringify({ v: 2, type: "purchaseWeapon", requestId: "r", weaponId: "pistol-01" }))).toMatchObject({ type: "purchaseWeapon" });
-    expect(() => serverMessageSchema.parse({ v: 2, type: "phase6State", snapshot: { schemaVersion: 1, profile: "phase6-production", shopOpen: false, shopUntil: 0, players: {}, gates: {}, objectives: {}, miniBoss: null, boss: null, outcome: "ACTIVE", summary: null, revision: 0 } })).not.toThrow();
+    expect(
+      parseClientMessage(
+        JSON.stringify({
+          v: 3,
+          type: "purchaseWeapon",
+          requestId: "r",
+          weaponId: "pistol-01",
+        }),
+      ),
+    ).toMatchObject({ type: "purchaseWeapon" });
+    expect(() =>
+      serverMessageSchema.parse({
+        v: 3,
+        type: "phase6State",
+        snapshot: {
+          schemaVersion: 1,
+          profile: "phase6-production",
+          shopOpen: false,
+          shopUntil: 0,
+          players: {},
+          gates: {},
+          objectives: {},
+          miniBoss: null,
+          boss: null,
+          outcome: "ACTIVE",
+          summary: null,
+          revision: 0,
+        },
+      }),
+    ).not.toThrow();
   });
 });

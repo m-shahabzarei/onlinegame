@@ -15,6 +15,12 @@ export function serverConfig(env: Record<string, string | undefined>) {
       GAMEPLAY_WEB_URL: z.url(),
       GAMEPLAY_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
       GAMEPLAY_HOST: z.string().default("127.0.0.1"),
+      GAMEPLAY_INTERMISSION_MS: z.coerce
+        .number()
+        .int()
+        .min(10000)
+        .max(60000)
+        .default(30000),
     })
     .parse(env);
   const origins = parsed.GAMEPLAY_ALLOWED_ORIGINS.split(",").map(
@@ -35,6 +41,10 @@ export function serverConfig(env: Record<string, string | undefined>) {
     webUrl: parsed.GAMEPLAY_WEB_URL,
     joinSecret: parsed.GAMEPLAY_JOIN_SECRET,
     controlSecret: parsed.GAMEPLAY_CONTROL_SECRET,
+    pve: {
+      profile: "phase6-production" as const,
+      intermissionMs: parsed.GAMEPLAY_INTERMISSION_MS,
+    },
     simulation: simulationConfigSchema.parse({
       ...SIMULATION,
       tickRate: Number(env.GAMEPLAY_TICK_RATE ?? SIMULATION.tickRate),

@@ -17,8 +17,8 @@
 .top,
 .bottom {
   position: absolute;
-  left: 1.5rem;
-  right: 1.5rem;
+  inset-inline-start: 1.5rem;
+  inset-inline-end: 1.5rem;
   display: flex;
   gap: 1rem;
   align-items: stretch;
@@ -60,7 +60,7 @@
   font-size: 0.55rem;
   border: 1px solid var(--border-strong);
   padding: 0.2rem 0.35rem;
-  margin-left: 0.5rem;
+  margin-inline-start: 0.5rem;
   color: var(--primary);
 }
 .connection {
@@ -138,7 +138,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.8rem;
-  border-left: 3px solid var(--destructive);
+  border-inline-start: 3px solid var(--destructive);
   background: var(--background);
 }
 .feedback {
@@ -161,7 +161,7 @@
   color: var(--muted-foreground);
 }
 .ammo {
-  margin-left: auto;
+  margin-inline-start: auto;
   min-width: 14rem;
 }
 .ammo > div strong {
@@ -334,7 +334,67 @@
   justify-content: space-between;
   gap: 1rem;
   font-size: 0.85rem;
-  min-height: 2rem;
+  min-height: 2.75rem;
+}
+.shopNotice {
+  position: absolute;
+  inset-inline: 1rem;
+  top: 7rem;
+  width: fit-content;
+  max-width: calc(100% - 2rem);
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  z-index: 4;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 1rem;
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+.resultNotice {
+  position: absolute;
+  inset-inline: 1rem;
+  top: 11rem;
+  z-index: 4;
+  margin-inline: auto;
+  max-width: 36rem;
+  padding: 0.6rem;
+  text-align: center;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+:global([lang="fa"]) .eyebrow,
+:global([lang="fa"]) .tag {
+  letter-spacing: normal;
+}
+:global([lang="fa"]) .card h1,
+:global([lang="fa"]) .mono {
+  font-family: inherit;
+}
+@media (max-width: 420px) {
+  .health strong {
+    font-size: 1.65rem;
+  }
+  .ammo > div strong {
+    font-size: 1.8rem;
+  }
+  .ammo {
+    max-width: 60%;
+  }
+  .bottom {
+    gap: 0.4rem;
+  }
+  .connection {
+    flex-wrap: wrap;
+  }
+  .shopNotice {
+    top: 6.5rem;
+  }
 }
 .check input {
   width: 1.1rem;
@@ -349,7 +409,7 @@
 .diagnostics {
   position: absolute;
   top: 6.5rem;
-  left: 1.5rem;
+  inset-inline-start: 1.5rem;
   z-index: 4;
   max-width: calc(100% - 3rem);
   overflow: auto;
@@ -363,8 +423,8 @@
 @media (max-width: 767px) {
   .top,
   .bottom {
-    left: 0.75rem;
-    right: 0.75rem;
+    inset-inline-start: 0.75rem;
+    inset-inline-end: 0.75rem;
   }
   .top {
     top: 0.75rem;
@@ -377,7 +437,7 @@
     display: none;
   }
   .connection {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .card {
     padding: 1.3rem;

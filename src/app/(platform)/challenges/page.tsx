@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { getRequestLocale, createTranslator, formatNumber } from "@/i18n";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -10,11 +10,18 @@ import {
 import { getStrictCurrentSession } from "@/server/dal/session";
 import { phase8Service } from "@/server/phase8/service";
 
-export const metadata: Metadata = {
-  title: "Challenges",
-  description: "Bounded daily and weekly TwoPlayer challenges.",
-};
+export async function generateMetadata() {
+  const locale = await getRequestLocale();
+  const t = createTranslator(locale);
+  return {
+    title: t("pages.challenges"),
+    description: t("pages.boundedDailyAndWeeklyTwoPlayerChallenges"),
+  };
+}
 export default async function ChallengesPage() {
+  const locale = await getRequestLocale();
+  const t = createTranslator(locale);
+
   const session = await getStrictCurrentSession();
   if (!session) redirect("/login?next=/challenges");
   let challenges = [] as Awaited<ReturnType<typeof phase8Service.challenges>>;
@@ -27,20 +34,21 @@ export default async function ChallengesPage() {
     <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div>
         <p className="text-primary font-mono text-xs font-semibold tracking-[0.2em] uppercase">
-          Keep it focused
+          {t("pages.keepItFocused")}
         </p>
         <h1 className="font-display text-foreground mt-2 text-3xl font-semibold sm:text-4xl">
-          Challenges
+          {t("pages.challenges")}
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl leading-7">
-          Server-confirmed progress earns curated cosmetics only. Challenges
-          never grant gameplay power or unlimited Scrap.
+          {t(
+            "pages.serverconfirmedProgressEarnsCuratedCosmeticsOnlyChallengesNeverGrant",
+          )}
         </p>
       </div>
       {challenges.length === 0 ? (
         <EmptyState
-          title="Challenges are unavailable"
-          description="Try again after the challenge service is ready."
+          title={t("pages.challengesAreUnavailable")}
+          description={t("pages.tryAgainAfterTheChallengeServiceIsReady")}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -49,10 +57,12 @@ export default async function ChallengesPage() {
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle as="h2" className="text-lg">
-                    {challenge.displayCopy}
+                    {t(`challengeUnits.${challenge.unit}`, {
+                      count: challenge.target,
+                    })}
                   </CardTitle>
                   <span className="text-muted-foreground font-mono text-xs uppercase">
-                    {challenge.cadence}
+                    {t(`challengeCadence.${challenge.cadence}`)}
                   </span>
                 </div>
               </CardHeader>
@@ -66,8 +76,11 @@ export default async function ChallengesPage() {
                   />
                 </div>
                 <p className="text-muted-foreground mt-3 text-sm">
-                  {challenge.progress} / {challenge.target} ·{" "}
-                  {challenge.completedAt ? "Completed" : "In progress"}
+                  {formatNumber(locale, challenge.progress)} /{" "}
+                  {formatNumber(locale, challenge.target)} ·{" "}
+                  {challenge.completedAt
+                    ? t("pages.completed")
+                    : t("pages.inProgress")}
                 </p>
               </CardContent>
             </Card>

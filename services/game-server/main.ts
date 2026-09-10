@@ -34,7 +34,7 @@ async function main() {
       JSON.stringify({
         event: "gameplay_listening",
         port: config.port,
-        protocol: 2,
+        protocol: 3,
         tickRate: config.simulation.tickRate,
         snapshotRate: config.simulation.snapshotRate,
       }),

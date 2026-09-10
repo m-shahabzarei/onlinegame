@@ -5,13 +5,13 @@ import { ZombiePresentationStore } from "./zombie-buffer";
 /** Original procedural stand-ins. Shared geometry/materials; no downloaded assets. */
 const appearance: Record<
   Archetype,
-  { color: number; height: number; radius: number; label: string }
+  { color: number; height: number; radius: number }
 > = {
-  walker: { color: 0x819889, height: 1.8, radius: 0.34, label: "WALKER" },
-  runner: { color: 0xbab58d, height: 1.65, radius: 0.3, label: "RUNNER" },
-  spitter: { color: 0x8dbaae, height: 1.75, radius: 0.34, label: "SPITTER" },
-  brute: { color: 0xa79489, height: 2.4, radius: 0.58, label: "BRUTE" },
-  screamer: { color: 0xb297b8, height: 1.9, radius: 0.34, label: "SCREAMER" },
+  walker: { color: 0x819889, height: 1.8, radius: 0.34 },
+  runner: { color: 0xbab58d, height: 1.65, radius: 0.3 },
+  spitter: { color: 0x8dbaae, height: 1.75, radius: 0.34 },
+  brute: { color: 0xa79489, height: 2.4, radius: 0.58 },
+  screamer: { color: 0xb297b8, height: 1.9, radius: 0.34 },
 };
 interface RenderSlot {
   group: THREE.Group;
@@ -66,10 +66,7 @@ export class ZombieRenderer {
       for (let i = 0; i < batch.count; i++) batch.setMatrixAt(i, this.hidden);
       this.group.add(batch);
     }
-    for (const [id, data] of Object.entries(appearance) as [
-      Archetype,
-      (typeof appearance)[Archetype],
-    ][]) {
+    for (const id of Object.keys(appearance) as Archetype[]) {
       const canvas = document.createElement("canvas");
       canvas.width = 256;
       canvas.height = 48;
@@ -77,9 +74,6 @@ export class ZombieRenderer {
       ctx.fillStyle = "#17222f";
       ctx.fillRect(0, 0, 256, 48);
       ctx.fillStyle = "#f1f3ff";
-      ctx.font = "bold 25px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(data.label, 128, 32);
       const texture = new THREE.CanvasTexture(canvas);
       this.labels.set(
         id,
@@ -126,6 +120,21 @@ export class ZombieRenderer {
         id: "",
         revision: 0,
       });
+    }
+  }
+  /** Redraw the five shared textures only when presentation changes. */
+  presentation(labels: Readonly<Record<Archetype, string>>, font: string) {
+    for (const [id, material] of this.labels) {
+      const texture = material.map!;
+      const canvas = texture.image as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#17222f";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#f1f3ff";
+      ctx.font = `bold 25px ${font}`;
+      ctx.textAlign = "center";
+      ctx.fillText(labels[id], 128, 32, 240);
+      texture.needsUpdate = true;
     }
   }
   render(

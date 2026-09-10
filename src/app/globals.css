@@ -6,6 +6,12 @@ html[data-locale="fa"] body {
 html[data-locale="fa"] .font-display {
   font-family: var(--font-vazirmatn), var(--font-geist), sans-serif;
 }
+html[data-locale="fa"] :is(.font-display, .font-mono, [class*="tracking-"]) {
+  letter-spacing: normal;
+}
+html[data-locale="fa"] .font-mono:not([dir="ltr"]) {
+  font-family: var(--font-vazirmatn), var(--font-geist), sans-serif;
+}
 
 .route-progress {
   position: fixed;

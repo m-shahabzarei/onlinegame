@@ -4,7 +4,10 @@ import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createGameplayService } from "../dist/game-server/services/game-server/server.js";
-import { WAVES } from "../dist/game-server/services/game-server/pve/waves.js";
+import {
+  PHASE6_WAVES,
+  WAVES,
+} from "../dist/game-server/services/game-server/pve/waves.js";
 import {
   PVE_RULES,
   ZOMBIES,
@@ -22,6 +25,7 @@ const port = 3100,
   fixturePort = 8092,
   base = `http://127.0.0.1:${port}`;
 const fixtureKey = process.env.PVE_FIXTURE_KEY;
+const shopTest = process.env.PVE_SHOP_TEST === "1";
 if (!fixtureKey || fixtureKey.length < 24)
   throw new Error("Set a private, temporary PVE_FIXTURE_KEY for local tests");
 const service = await createGameplayService({
@@ -31,15 +35,17 @@ const service = await createGameplayService({
   pve: {
     seed: 4533,
     rules: { ...PVE_RULES, reviveMs: 1500, bleedOutMs: 15000 },
-    waves: WAVES.map((w) => ({
+    waves: (shopTest ? PHASE6_WAVES : WAVES).map((w) => ({
       ...w,
-      budget: Math.max(
-        3,
-        w.guaranteed.reduce((n, a) => n + ZOMBIES.get(a).cost, 0),
-      ),
+      budget: shopTest
+        ? w.budget
+        : Math.max(
+            3,
+            w.guaranteed.reduce((n, a) => n + ZOMBIES.get(a).cost, 0),
+          ),
       interval: [300, 300],
       initialDelayMs: 1000,
-      intermissionMs: 3500,
+      intermissionMs: shopTest ? 30000 : 3500,
     })),
   },
   async lifecycle(matchId, runtimeId, state, outcome) {
@@ -88,7 +94,35 @@ const fixtures = createServer(async (req, res) => {
     const sim = match.pve,
       players = match.players.map((p) => p.state),
       now = Date.now();
-    if (action === "protect")
+    if (action === "stageWave" && shopTest) {
+      for (const p of players) p.protectedUntil = now + 300000;
+      const p = players[0];
+      Object.assign(p.position, { x: -3, y: 0.04, z: 14 });
+      p.yaw = 0;
+      p.pitch = 0;
+      p.velocity.x = p.velocity.z = 0;
+      let index = 0;
+      for (const z of sim.entities.entities) {
+        if (z.health <= 0) continue;
+        Object.assign(z.position, { x: -3, y: 0.04, z: 10 - index++ * 1.2 });
+        z.state = 4;
+        z.stateUntil = now + 60000;
+        z.velocity.x = z.velocity.z = 0;
+      }
+    } else if (action === "disconnect" && shopTest) {
+      // Close the real transport; the browser must bootstrap and restore its session.
+      match.players[0].peer?.close();
+    } else if (action === "expireShop" && shopTest) {
+      match.phase6.shopUntil = now;
+      sim.waves.state.until = now;
+    } else if (action === "layoutShop" && shopTest) {
+      // Responsive screenshots can take longer than a real intermission on
+      // software-rendered CI. Extend only the current safe window for layout QA.
+      if (!match.phase6.shopOpen || sim.waves.state.state !== "INTERMISSION")
+        throw new Error("Layout fixture requires an existing intermission");
+      match.phase6.shopUntil = now + 60000;
+      sim.waves.state.until = now + 60000;
+    } else if (action === "protect")
       for (const p of players) p.protectedUntil = now + 300000;
     else if (action === "combat") {
       for (const p of players) p.protectedUntil = now + 300000;
@@ -183,7 +217,8 @@ const env = {
   GAMEPLAY_SERVER_HTTP_URL: `http://127.0.0.1:${gamePort}`,
   GAMEPLAY_WS_URL: `ws://127.0.0.1:${gamePort}/gameplay`,
 };
-delete env.DATABASE_URL;
+// An empty override prevents Next's dotenv loader restoring a developer's DB URL.
+env.DATABASE_URL = "";
 const web = spawn(
   process.execPath,
   [

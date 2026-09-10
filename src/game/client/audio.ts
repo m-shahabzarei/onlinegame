@@ -1,5 +1,16 @@
 import type { Vec3 } from "../shared/protocol";
+import type { WeaponDefinition } from "../shared/phase6";
 export type Sound =
+  | "synth-rifle"
+  | "synth-reload"
+  | "pistol-fire"
+  | "pistol-reload"
+  | "smg-fire"
+  | "smg-reload"
+  | "shotgun-fire"
+  | "shotgun-reload"
+  | "heavy-fire"
+  | "heavy-reload"
   | "fire"
   | "reload"
   | "empty"
@@ -20,7 +31,17 @@ export type Sound =
   | "waveClear"
   | "defeat"
   | "complete";
-const cues: Record<Sound, readonly [number, number, number]> = {
+export const cues: Record<Sound, readonly [number, number, number]> = {
+  "synth-rifle": [160, 45, 0.09],
+  "synth-reload": [330, 130, 0.24],
+  "pistol-fire": [420, 90, 0.075],
+  "pistol-reload": [580, 260, 0.15],
+  "smg-fire": [250, 65, 0.055],
+  "smg-reload": [440, 190, 0.2],
+  "shotgun-fire": [85, 22, 0.23],
+  "shotgun-reload": [180, 60, 0.42],
+  "heavy-fire": [110, 28, 0.3],
+  "heavy-reload": [240, 80, 0.34],
   fire: [160, 45, 0.09],
   reload: [330, 130, 0.24],
   empty: [90, 130, 0.045],
@@ -81,6 +102,14 @@ export class GameAudio {
       listener.upZ.value = 0;
     }
   }
+  playWeapon(
+    event: "fire" | "reload",
+    weapon: WeaponDefinition,
+    position?: Vec3,
+  ) {
+    const cue = event === "fire" ? weapon.fireAudio : weapon.reloadAudio;
+    if (Object.hasOwn(cues, cue)) this.play(cue as Sound, position);
+  }
   play(sound: Sound, position?: Vec3) {
     const ctx = this.context;
     if (
@@ -118,13 +147,15 @@ export class GameAudio {
       gain = ctx.createGain();
     const now = ctx.currentTime,
       [startFrequency, endFrequency, duration] = cues[sound];
-    oscillator.type = sound === "fire" ? "sawtooth" : "triangle";
+    const firing =
+      sound === "fire" || sound === "synth-rifle" || sound.endsWith("-fire");
+    oscillator.type = firing ? "sawtooth" : "triangle";
     oscillator.frequency.setValueAtTime(startFrequency, now);
     oscillator.frequency.exponentialRampToValueAtTime(
       endFrequency,
       now + duration,
     );
-    gain.gain.setValueAtTime(sound === "fire" ? 0.16 : 0.07, now);
+    gain.gain.setValueAtTime(firing ? 0.16 : 0.07, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     oscillator.connect(gain);
     let panner: PannerNode | null = null;

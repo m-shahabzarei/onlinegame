@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { redirect } from "next/navigation";
 
 import { LogoutButton, SettingsForm } from "@/components/forms";
@@ -16,12 +16,17 @@ import { updateSettingsAction } from "@/server/actions/settings";
 import { getStrictCurrentSession } from "@/server/dal/session";
 import { ReplayOnboarding } from "@/components/onboarding/replay-onboarding";
 
-export const metadata: Metadata = {
-  title: "Settings",
-  description: "Manage your TwoPlayer account and experience preferences.",
-};
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.settings"),
+    description: t("pages.manageYourTwoPlayerAccountAndExperiencePreferences"),
+  };
+}
 
 export default async function SettingsPage() {
+  const t = createTranslator(await getRequestLocale());
+
   const session = await getStrictCurrentSession();
   if (!session) redirect("/login?next=/settings");
 
@@ -31,14 +36,13 @@ export default async function SettingsPage() {
     <section className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div className="space-y-3">
         <p className="text-primary font-mono text-xs font-semibold tracking-[0.2em] uppercase">
-          Control room
+          {t("pages.controlRoom")}
         </p>
         <h1 className="font-display text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-          Settings
+          {t("pages.settings")}
         </h1>
         <p className="text-muted-foreground max-w-2xl leading-7">
-          Tune your account preferences. Sound is represented here as a
-          placeholder until the game client arrives.
+          {t("pages.tuneYourAccountPreferencesSoundIsRepresentedHereAs")}
         </p>
       </div>
       <SettingsForm
@@ -51,9 +55,9 @@ export default async function SettingsPage() {
       />
       <Card variant="subtle">
         <CardHeader>
-          <CardTitle as="h2">Getting started</CardTitle>
+          <CardTitle as="h2">{t("pages.gettingStarted")}</CardTitle>
           <CardDescription>
-            Review room, match and control guidance whenever you need it.
+            {t("pages.reviewRoomMatchAndControlGuidanceWheneverYouNeed")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -63,8 +67,10 @@ export default async function SettingsPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle as="h2">Account session</CardTitle>
-            <CardDescription>End this browser session safely.</CardDescription>
+            <CardTitle as="h2">{t("pages.accountSession")}</CardTitle>
+            <CardDescription>
+              {t("pages.endThisBrowserSessionSafely")}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <LogoutButton action={logoutAction} />
@@ -72,21 +78,20 @@ export default async function SettingsPage() {
         </Card>
         <Card variant="subtle" className="border-border-strong/70">
           <CardHeader>
-            <CardTitle as="h2">Delete account</CardTitle>
+            <CardTitle as="h2">{t("pages.deleteAccount")}</CardTitle>
             <CardDescription>
-              Account deletion will be available only with a verified,
-              reversible flow.
+              {t("pages.accountDeletionWillBeAvailableOnlyWithAVerified")}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
-            <Badge variant="neutral">Not available yet</Badge>
+            <Badge variant="neutral">{t("pages.notAvailableYet")}</Badge>
             <Button
               type="button"
               variant="outline"
               disabled
               aria-disabled="true"
             >
-              Request deletion
+              {t("pages.requestDeletion")}
             </Button>
           </CardContent>
         </Card>

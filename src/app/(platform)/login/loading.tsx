@@ -1,11 +1,14 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { Card, Skeleton } from "@/components/ui";
 
-export default function LoginLoading() {
+export default async function LoginLoading() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <section
       className="mx-auto w-full max-w-lg px-4 py-10 sm:px-6 sm:py-14"
       aria-busy="true"
-      aria-label="Loading sign in"
+      aria-label={t("pages.loadingSignIn")}
     >
       <Card className="min-h-96 p-6 sm:p-8" variant="elevated">
         <Skeleton className="h-4 w-32" radius="full" />

@@ -166,50 +166,23 @@ export const lobbyCommandSchema = z.discriminatedUnion("type", [
 export type LobbyCommand = z.infer<typeof lobbyCommandSchema>;
 export type CommandResult = { room: LobbySnapshot | null; code: string };
 export const LOBBY_ERRORS = {
-  INVALID_INPUT: [400, "Check the room code and form fields."],
-  UNAUTHENTICATED: [
-    401,
-    "Your session has ended. Sign in or continue as a guest.",
-  ],
-  FORBIDDEN: [403, "You cannot perform this room action."],
-  ROOM_UNAVAILABLE: [
-    404,
-    "This invite is unavailable. Check the code, or ask the host for a new invite.",
-  ],
-  ROOM_FULL: [409, "This room is full. Choose another room or create one."],
-  ROOM_CLOSED: [410, "This room is closed."],
-  ROOM_EXPIRED: [410, "This room has expired. Create a new room."],
-  ROOM_KICKED: [403, "The host removed you from this room."],
-  MEMBERSHIP_ENDED: [
-    410,
-    "Your room membership ended. You can join again if a slot is available.",
-  ],
-  ALREADY_IN_ROOM: [
-    409,
-    "You already belong to another room. Return to it and leave before joining another.",
-  ],
-  GAME_UNAVAILABLE: [409, "Room preparation is unavailable for this game."],
-  INVALID_TRANSITION: [
-    409,
-    "This action is unavailable in the room’s current state.",
-  ],
-  NOT_READY: [
-    409,
-    "Two connected, ready players are required to prepare this session.",
-  ],
-  STALE_STATE: [
-    409,
-    "The room changed. The latest state has been loaded; try your action again.",
-  ],
-  IDEMPOTENCY_CONFLICT: [
-    409,
-    "This request key was already used for a different action.",
-  ],
-  RATE_LIMITED: [429, "Too many attempts. Wait a minute and try again."],
-  SERVICE_UNAVAILABLE: [
-    503,
-    "The room service is temporarily unavailable. Your input has been kept; retry shortly.",
-  ],
+  INVALID_INPUT: [400, "INVALID_INPUT"],
+  UNAUTHENTICATED: [401, "UNAUTHENTICATED"],
+  FORBIDDEN: [403, "FORBIDDEN"],
+  ROOM_UNAVAILABLE: [404, "ROOM_UNAVAILABLE"],
+  ROOM_FULL: [409, "ROOM_FULL"],
+  ROOM_CLOSED: [410, "ROOM_CLOSED"],
+  ROOM_EXPIRED: [410, "ROOM_EXPIRED"],
+  ROOM_KICKED: [403, "ROOM_KICKED"],
+  MEMBERSHIP_ENDED: [410, "MEMBERSHIP_ENDED"],
+  ALREADY_IN_ROOM: [409, "ALREADY_IN_ROOM"],
+  GAME_UNAVAILABLE: [409, "GAME_UNAVAILABLE"],
+  INVALID_TRANSITION: [409, "INVALID_TRANSITION"],
+  NOT_READY: [409, "NOT_READY"],
+  STALE_STATE: [409, "STALE_STATE"],
+  IDEMPOTENCY_CONFLICT: [409, "IDEMPOTENCY_CONFLICT"],
+  RATE_LIMITED: [429, "RATE_LIMITED"],
+  SERVICE_UNAVAILABLE: [503, "SERVICE_UNAVAILABLE"],
 } as const;
 export type LobbyErrorCode = keyof typeof LOBBY_ERRORS;
 export class LobbyError extends Error {
@@ -256,18 +229,10 @@ export function startBlocker(
   members: LobbyMember[],
   maxPlayers: number,
 ): string | null {
-  if (maxPlayers > 1 && members.length !== maxPlayers)
-    return maxPlayers === 1
-      ? null
-      : `Invite another player (${members.length}/${maxPlayers} slots filled).`;
+  if (maxPlayers > 1 && members.length !== maxPlayers) return "INVITE_PLAYER";
   if (members.some((m) => m.connection !== "CONNECTED"))
-    return maxPlayers === 1
-      ? "Waiting for you to connect."
-      : "Waiting for both players to connect.";
-  if (members.some((m) => !m.ready))
-    return maxPlayers === 1
-      ? "You must be Ready."
-      : "Both players must be Ready.";
+    return "WAITING_FOR_CONNECTION";
+  if (members.some((m) => !m.ready)) return "READY_REQUIRED";
   return null;
 }
 export function reconcileSnapshot(

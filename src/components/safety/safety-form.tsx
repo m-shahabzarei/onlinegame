@@ -1,76 +1,95 @@
 "use client";
+import { useTranslations } from "@/i18n/provider";
+
 import { FormEvent, useState } from "react";
 import { Button, Input, Select } from "@/components/ui";
 
 export function SafetyForm() {
-  const [message, setMessage] = useState<string | null>(null);
+  const t = useTranslations();
+
+  const [message, setMessage] = useState<
+    "reportSubmitted" | "reportLimited" | "reportFailure" | null
+  >(null);
   const [pending, setPending] = useState(false);
-  const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  const [blockMessage, setBlockMessage] = useState<
+    "playerBlocked" | "blockFailure" | null
+  >(null);
+  const [blocking, setBlocking] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
     setMessage(null);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "report",
-        targetUserId: form.get("targetUserId"),
-        reason: form.get("reason"),
-        details: form.get("details") || undefined,
-      }),
-    });
-    const body = await response.json().catch(() => null);
-    setMessage(
-      body?.ok
-        ? "Report submitted. Thank you for helping keep sessions safe."
-        : body?.code === "RATE_LIMITED"
-          ? "You have reached the report limit for this player today."
-          : "We could not submit that report. Check the identifier and try again.",
-    );
-    setPending(false);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "report",
+          targetUserId: form.get("targetUserId"),
+          reason: form.get("reason"),
+          details: form.get("details") || undefined,
+        }),
+      });
+      const body = await response.json().catch(() => null);
+      setMessage(
+        body?.ok
+          ? "reportSubmitted"
+          : body?.code === "RATE_LIMITED"
+            ? "reportLimited"
+            : "reportFailure",
+      );
+    } catch {
+      setMessage("reportFailure");
+    } finally {
+      setPending(false);
+    }
   }
   async function block(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const targetUserId = new FormData(event.currentTarget).get("targetUserId");
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "block", targetUserId, blocked: true }),
-    });
-    setBlockMessage(
-      response.ok
-        ? "Player blocked for future supported communication channels."
-        : "We could not update the block list.",
-    );
+    setBlocking(true);
+    setBlockMessage(null);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "block", targetUserId, blocked: true }),
+      });
+      setBlockMessage(response.ok ? "playerBlocked" : "blockFailure");
+    } catch {
+      setBlockMessage("blockFailure");
+    } finally {
+      setBlocking(false);
+    }
   }
   return (
     <div className="grid gap-5">
       <form className="grid gap-5" onSubmit={submit}>
         <Input
-          label="Player identifier"
+          label={t("platform.playerId")}
           name="targetUserId"
+          dir="ltr"
           required
           maxLength={128}
-          description="Use the identifier shown by the match or support flow."
+          description={t("platform.playerIdHelp")}
         />
         <Select
-          label="Reason"
+          label={t("platform.reportReason")}
           name="reason"
           options={[
-            { value: "ABUSE", label: "Abuse" },
-            { value: "CHEATING", label: "Cheating" },
-            { value: "HARASSMENT", label: "Harassment" },
-            { value: "EXPLOIT", label: "Exploit" },
-            { value: "OTHER", label: "Other" },
+            { value: "ABUSE", label: t("platform.abuse") },
+            { value: "CHEATING", label: t("platform.cheating") },
+            { value: "HARASSMENT", label: t("platform.harassment") },
+            { value: "EXPLOIT", label: t("platform.exploit") },
+            { value: "OTHER", label: t("platform.other") },
           ]}
         />
         <label className="grid gap-2">
           <span className="text-foreground text-sm font-semibold">
-            Details{" "}
+            {t("platform.details")}{" "}
             <span className="text-muted-foreground font-normal">
-              (optional)
+              {t("platform.optional")}
             </span>
           </span>
           <textarea
@@ -78,7 +97,7 @@ export function SafetyForm() {
             maxLength={500}
             rows={4}
             className="border-border bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-            placeholder="What happened?"
+            placeholder={t("platform.whatHappened")}
           />
         </label>
         {message ? (
@@ -87,22 +106,27 @@ export function SafetyForm() {
             aria-live="polite"
             className="text-muted-foreground text-sm"
           >
-            {message}
+            {t(`platform.${message}`)}
           </p>
         ) : null}
-        <Button type="submit" loading={pending} loadingText="Submitting…">
-          Submit report
+        <Button
+          type="submit"
+          loading={pending}
+          loadingText={t("platform.submitting")}
+        >
+          {t("platform.submitReport")}
         </Button>
       </form>
       <form onSubmit={block} className="flex flex-wrap items-center gap-3">
         <Input
-          label="Player identifier to block"
+          label={t("platform.blockPlayerId")}
           name="targetUserId"
+          dir="ltr"
           required
           maxLength={128}
         />
-        <Button type="submit" variant="outline">
-          Block player
+        <Button type="submit" variant="outline" loading={blocking}>
+          {t("platform.blockPlayer")}
         </Button>
         {blockMessage ? (
           <p
@@ -110,7 +134,7 @@ export function SafetyForm() {
             aria-live="polite"
             className="text-muted-foreground text-sm"
           >
-            {blockMessage}
+            {t(`platform.${blockMessage}`)}
           </p>
         ) : null}
       </form>

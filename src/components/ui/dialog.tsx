@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "@/i18n/provider";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -39,41 +40,38 @@ export const DialogContent = React.forwardRef<
   DialogContentProps
 >(
   (
-    {
-      children,
-      className,
-      closeLabel = "Close dialog",
-      showCloseButton = true,
-      ...props
-    },
+    { children, className, closeLabel, showCloseButton = true, ...props },
     ref,
-  ) => (
-    <DialogPrimitive.Portal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "tp-dialog-content border-border-strong bg-surface-elevated text-foreground shadow-dialog fixed top-1/2 left-1/2 z-[var(--z-dialog)] grid max-h-[min(44rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-xl border p-6 focus:outline-none sm:p-8",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton ? (
-          <DialogPrimitive.Close asChild>
-            <IconButton
-              label={closeLabel}
-              size="sm"
-              variant="ghost"
-              className="absolute end-3 top-3"
-            >
-              <X aria-hidden="true" />
-            </IconButton>
-          </DialogPrimitive.Close>
-        ) : null}
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>
-  ),
+  ) => {
+    const t = useTranslations();
+    return (
+      <DialogPrimitive.Portal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            "tp-dialog-content border-border-strong bg-surface-elevated text-foreground shadow-dialog fixed top-1/2 left-1/2 z-[var(--z-dialog)] grid max-h-[min(44rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-xl border p-6 focus:outline-none sm:p-8",
+            className,
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton ? (
+            <DialogPrimitive.Close asChild>
+              <IconButton
+                label={closeLabel ?? t("platform.closeDialog")}
+                size="sm"
+                variant="ghost"
+                className="absolute end-3 top-3"
+              >
+                <X aria-hidden="true" />
+              </IconButton>
+            </DialogPrimitive.Close>
+          ) : null}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    );
+  },
 );
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 

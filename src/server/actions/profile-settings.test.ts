@@ -7,9 +7,13 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   updateProfile: vi.fn(),
   updateSettings: vi.fn(),
+  setCookie: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ set: mocks.setCookie }),
+}));
 vi.mock("@/server/dal/session", () => ({
   getStrictCurrentUser: mocks.getStrictCurrentUser,
 }));
@@ -67,7 +71,7 @@ describe("profile and settings actions", () => {
 
     const result = await updateProfileAction({ ok: false }, formData);
 
-    expect(result).toEqual({ ok: true, message: "Profile saved." });
+    expect(result).toEqual({ ok: true, message: "profileSaved" });
     expect(mocks.updateProfile).toHaveBeenCalledWith("session-user", {
       username: "night_runner",
       displayName: "Night Runner Prime",
@@ -85,7 +89,12 @@ describe("profile and settings actions", () => {
 
     const result = await updateSettingsAction({ ok: false }, formData);
 
-    expect(result).toEqual({ ok: true, message: "Preferences saved." });
+    expect(result).toEqual({ ok: true, message: "preferencesSaved" });
+    expect(mocks.setCookie).toHaveBeenCalledWith(
+      "twoplayer_locale",
+      "fa",
+      expect.any(Object),
+    );
     expect(mocks.updateSettings).toHaveBeenCalledWith("session-user", {
       locale: "fa",
       reducedMotion: true,
@@ -101,6 +110,19 @@ describe("profile and settings actions", () => {
     expect(result).toMatchObject({
       ok: false,
       error: { code: "AUTH_UNAVAILABLE" },
+    });
+  });
+
+  it("surfaces cookie persistence failures instead of claiming locale success", async () => {
+    mocks.updateSettings.mockResolvedValue({ ok: true, data: { user } });
+    mocks.setCookie.mockImplementationOnce(() => {
+      throw new Error("cookie unavailable");
+    });
+    const form = new FormData();
+    form.set("locale", "fa");
+    expect(await updateSettingsAction({ ok: false }, form)).toMatchObject({
+      ok: false,
+      error: { message: "preferencesFailure" },
     });
   });
 });

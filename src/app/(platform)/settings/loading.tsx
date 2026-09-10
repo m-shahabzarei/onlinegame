@@ -1,11 +1,14 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { Card, Skeleton } from "@/components/ui";
 
-export default function SettingsLoading() {
+export default async function SettingsLoading() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <section
       className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-10 sm:px-6 sm:py-14 lg:px-8"
       aria-busy="true"
-      aria-label="Loading account settings"
+      aria-label={t("pages.loadingAccountSettings")}
     >
       <div>
         <Skeleton className="h-4 w-32" radius="full" />

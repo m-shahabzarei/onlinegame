@@ -11,7 +11,6 @@ import {
   MAP_ID,
   MAP_VERSION,
   MOVEMENT,
-  RIFLE,
   SIMULATION,
   type SimulationConfig,
 } from "../../src/game/shared/config";
@@ -50,6 +49,7 @@ import {
 import { PvESimulation, type PvEOptions } from "./pve/simulation";
 import { eligiblePlayer } from "./pve/targeting";
 import { Phase6MatchState, type Phase6Command } from "./phase6";
+import { resolveWeaponStats } from "../../src/game/shared/phase6";
 export interface Peer {
   send(message: ServerMessage): void;
   close(): void;
@@ -124,18 +124,21 @@ export class MatchInstance {
         receivedTick: 0,
         disconnectedAt: 0,
         inputBudget: new RateBudget(config.inputRate + 3, 12, now()),
-        fireBudget: new RateBudget(10, 4, now()),
+        fireBudget: new RateBudget(16, 6, now()),
         commandBudget: new RateBudget(8, 12, now()),
         interactionSeq: 0,
       };
     });
-    const soloOptions = this.mode === "solo" && !pveOptions.waves
-      ? { ...pveOptions, profile: "phase5-test" as const }
-      : pveOptions;
+    const soloOptions: PvEOptions = {
+      ...pveOptions,
+      profile: pveOptions.profile ?? "phase6-production",
+    };
     this.phase6 = new Phase6MatchState(
       soloOptions.profile ?? "phase6-production",
       this.players.map((p) => p.state.id),
     );
+    for (const p of this.players)
+      p.state.weapon = this.phase6.players.get(p.state.id)!.ammo["ar-01"]!;
     this.pve = new PvESimulation(
       this.players.map((p) => p.state),
       this.physics,
@@ -150,9 +153,10 @@ export class MatchInstance {
     if (terminalState(this.state)) return;
     if (wave.state === "INTERMISSION") {
       this.phase6.completeWave(wave.number);
-      this.phase6.openShop(this.now());
+      const now = this.now();
+      this.phase6.openShop(now, Math.max(0, wave.until - now));
       this.broadcast({
-        v: 2,
+        v: 3,
         type: "phase6State",
         snapshot: this.phase6.snapshot(),
       });
@@ -166,7 +170,7 @@ export class MatchInstance {
       this.phase6.completeWave(wave.number);
       this.phase6.spawnBoss();
       this.broadcast({
-        v: 2,
+        v: 3,
         type: "phase6State",
         snapshot: this.phase6.snapshot(),
       });
@@ -174,16 +178,18 @@ export class MatchInstance {
       return;
     }
     if (wave.state === "PHASE_COMPLETE" || wave.state === "TEAM_DEFEATED") {
+      if (wave.state === "TEAM_DEFEATED")
+        this.phase6.defeat(wave.reason || "team_defeated");
       this.outcome = {
         result: wave.state,
-        reason: wave.reason || "Five-wave survival complete",
+        reason: wave.reason || "survival_complete",
         completedWaves:
           wave.state === "PHASE_COMPLETE"
             ? wave.number
             : Math.max(0, wave.number - 1),
       };
       this.broadcast({
-        v: 2,
+        v: 3,
         type: "worldSnapshot",
         snapshot: this.snapshot(),
       });
@@ -193,9 +199,17 @@ export class MatchInstance {
   private change(next: MatchState) {
     if (this.state === next) return;
     this.state = transition(this.state, next);
-    if (terminalState(next)) this.endedAt = this.now();
+    if (terminalState(next)) {
+      this.endedAt = this.now();
+      if (this.phase6.closeShop(this.now(), true))
+        this.broadcast({
+          v: 3,
+          type: "phase6State",
+          snapshot: this.phase6.snapshot(),
+        });
+    }
     this.broadcast({
-      v: 2,
+      v: 3,
       type: "matchState",
       state: next,
       startAt: this.startAt,
@@ -244,8 +258,9 @@ export class MatchInstance {
     p.receivedSeq = p.state.lastInput;
     p.receivedTick = 0;
     p.interactionSeq = 0;
+    this.phase6.players.get(p.state.id)!.triggerReleased = true;
     peer.send({
-      v: 2,
+      v: 3,
       type: "welcome",
       playerId: p.state.id,
       matchId: this.reservation.matchId,
@@ -276,9 +291,10 @@ export class MatchInstance {
       this.pve.revive.current?.reviverId === playerId ||
       this.pve.revive.current?.targetId === playerId
     )
-      this.pve.revive.cancel("Player disconnected");
+      this.pve.revive.cancel("player_disconnected");
     if (terminalState(this.state)) return;
-    if (this.state === "PLAYING") this.change("RECONNECTING");
+    if (this.state === "PLAYING" || this.state === "BOSS_ACTIVE")
+      this.change("RECONNECTING");
     else if (this.state === "COUNTDOWN" || this.state === "LOADING") {
       this.startAt = 0;
       this.pve.waves.prepare();
@@ -302,7 +318,7 @@ export class MatchInstance {
     if (!budget.consume(now)) throw new GameError("RATE_LIMITED");
     if (message.type === "ping") {
       peer.send({
-        v: 2,
+        v: 3,
         type: "pong",
         sentAt: message.sentAt,
         serverTime: now,
@@ -313,7 +329,8 @@ export class MatchInstance {
       this.end();
       return;
     }
-    if (terminalState(this.state)) throw new GameError("MATCH_UNAVAILABLE");
+    if (terminalState(this.state) && !("requestId" in message))
+      throw new GameError("MATCH_UNAVAILABLE");
     if (message.type === "clientReady") {
       if (message.mapId !== MAP_ID || message.mapVersion !== MAP_VERSION)
         throw new GameError("PROTOCOL_MISMATCH");
@@ -330,11 +347,54 @@ export class MatchInstance {
           this.startAt = now + this.config.countdownMs;
           this.change("COUNTDOWN");
           this.pve.waves.countdown(this.startAt);
-        } else if (this.state === "RECONNECTING") this.change("PLAYING");
+        } else if (this.state === "RECONNECTING")
+          this.change(this.pve.bossEntityId ? "BOSS_ACTIVE" : "PLAYING");
       }
       return;
     }
-    if (!["PLAYING", "RECONNECTING"].includes(this.state) || !p.state.ready)
+    if ("requestId" in message) {
+      const result = this.phase6.execute(
+        p.state.id,
+        message as Phase6Command,
+        now,
+        ["PLAYING", "RECONNECTING", "BOSS_ACTIVE"].includes(this.state) &&
+          eligiblePlayer(p.state) &&
+          !this.pve.recoveryPending &&
+          this.pve.revive.current?.reviverId !== playerId,
+        this.pve.waves.state.state === "INTERMISSION",
+      );
+      const inventory = this.phase6.players.get(p.state.id)!;
+      p.state.weapon = inventory.ammo[inventory.equippedWeapon]!;
+      peer.send({
+        v: 3,
+        type: "shopResult",
+        requestId: message.requestId,
+        code: result.reason,
+        snapshot: result.snapshot,
+      });
+      if (result.ok)
+        this.broadcast({
+          v: 3,
+          type: "phase6State",
+          snapshot: result.snapshot,
+        });
+      return;
+    }
+    if (message.type === "triggerRelease") {
+      const inventory = this.phase6.players.get(p.state.id)!;
+      if (
+        message.seq >= inventory.lastTrigger &&
+        message.seq <= inventory.lastTrigger + 128
+      ) {
+        inventory.lastTrigger = message.seq;
+        inventory.triggerReleased = true;
+      }
+      return;
+    }
+    if (
+      !["PLAYING", "RECONNECTING", "BOSS_ACTIVE"].includes(this.state) ||
+      !p.state.ready
+    )
       throw new GameError("NOT_PLAYING");
     if (message.type === "beginRevive" || message.type === "cancelRevive") {
       if (message.seq <= p.interactionSeq) return;
@@ -342,7 +402,7 @@ export class MatchInstance {
         throw new GameError("INVALID_MESSAGE");
       p.interactionSeq = message.seq;
       if (message.type === "cancelRevive")
-        this.pve.revive.cancel("Interact released", playerId);
+        this.pve.revive.cancel("interact_released", playerId);
       else if (this.pve.combat)
         this.pve.revive.begin(
           p.state,
@@ -366,7 +426,7 @@ export class MatchInstance {
         p.state.lastInput = p.receivedSeq;
         p.receivedTick = this.tick;
         peer.send({
-          v: 2,
+          v: 3,
           type: "movementCorrection",
           player: structuredClone(p.state),
           tick: this.tick,
@@ -380,40 +440,27 @@ export class MatchInstance {
       return;
     }
     if (
-      [
-        "purchaseWeapon",
-        "purchaseAmmo",
-        "purchaseUpgrade",
-        "purchaseArmor",
-        "purchaseMedkit",
-        "purchaseGrenade",
-        "purchaseDeployable",
-        "equipWeapon",
-        "unlockGate",
-        "beginObjectiveInteraction",
-      ].includes(message.type)
-    ) {
-      if (!eligiblePlayer(p.state)) throw new GameError("NOT_PLAYING");
-      const result = this.phase6.execute(
-        p.state.id,
-        message as Phase6Command,
-        now,
-      );
-      peer.send({ v: 2, type: "phase6State", snapshot: result.snapshot });
-      if (!result.ok) throw new GameError("NOT_PLAYING");
-      return;
-    }
-    if (
       !eligiblePlayer(p.state) ||
       this.pve.revive.current?.reviverId === playerId ||
       this.pve.recoveryPending
     )
       throw new GameError("NOT_PLAYING");
     if (message.type === "reload") {
-      const started = reloadWeapon(p.state.weapon, message.seq, now);
+      const inventory = this.phase6.players.get(playerId)!;
+      if (message.seq <= inventory.lastReload) return;
+      if (message.seq > inventory.lastReload + 128)
+        throw new GameError("INVALID_RELOAD");
+      p.state.weapon.lastReload = inventory.lastReload;
+      inventory.lastReload = message.seq;
+      const stats = resolveWeaponStats(
+        inventory.equippedWeapon,
+        inventory.upgrades[inventory.equippedWeapon] ?? 0,
+      );
+      const started = reloadWeapon(p.state.weapon, message.seq, now, stats);
       peer.send({
-        v: 2,
+        v: 3,
         type: "weaponState",
+        weaponId: inventory.equippedWeapon,
         playerId,
         weapon: { ...p.state.weapon },
         event: started ? "reloadStarted" : "unchanged",
@@ -421,6 +468,11 @@ export class MatchInstance {
       return;
     }
     if (message.type === "fire") {
+      const inventory = this.phase6.players.get(playerId)!;
+      const stats = resolveWeaponStats(
+        inventory.equippedWeapon,
+        inventory.upgrades[inventory.equippedWeapon] ?? 0,
+      );
       try {
         if (Math.abs(message.tick - this.tick) > LIMITS.inputTickWindow)
           throw new GameError("INPUT_WINDOW");
@@ -431,7 +483,27 @@ export class MatchInstance {
               this.tick - Math.ceil(this.config.tickRate * 0.6))
         )
           throw new GameError("INPUT_WINDOW");
-        fireWeapon(p.state.weapon, message.seq, now);
+        if (
+          message.seq <= inventory.lastShot ||
+          message.seq > inventory.lastShot + 128
+        )
+          throw new GameError("SHOT_SEQUENCE");
+        p.state.weapon.lastShot = inventory.lastShot;
+        inventory.lastShot = message.seq;
+        if (
+          message.triggerSeq < inventory.lastTrigger ||
+          message.triggerSeq > inventory.lastTrigger + 128 ||
+          (message.triggerSeq === inventory.lastTrigger &&
+            (inventory.triggerReleased || stats.fireMode !== "automatic")) ||
+          (message.triggerSeq > inventory.lastTrigger &&
+            !inventory.triggerReleased)
+        )
+          throw new GameError("SHOT_SEQUENCE");
+        inventory.lastTrigger = message.triggerSeq;
+        inventory.triggerReleased = false;
+        if (now < inventory.nextFireAt) throw new GameError("FIRE_RATE");
+        fireWeapon(p.state.weapon, message.seq, now, stats);
+        inventory.nextFireAt = p.state.weapon.nextFireAt;
         const origin = {
           ...p.state.position,
           y: p.state.position.y + playerHeight(p.state) - MOVEMENT.eyeInset,
@@ -441,11 +513,13 @@ export class MatchInstance {
           message.pitch,
           Math.hypot(p.state.velocity.x, p.state.velocity.z) > 0.3,
           () => randomInt(0, 1000000) / 1000000,
+          stats,
         );
         const impact = this.physics.raycast(
           origin,
           direction,
           (id) => !!this.targets.find((t) => t.id === id && t.health > 0),
+          stats.range,
         );
         const wallDistance = Math.hypot(
           impact.point.x - origin.x,
@@ -458,10 +532,61 @@ export class MatchInstance {
           Math.min(this.tick, message.viewTick ?? this.tick),
         );
         const hit = this.pve.combat
-          ? this.pve.damage.hit(origin, direction, wallDistance, rewindTick)
+          ? this.pve.damage.hit(
+              origin,
+              direction,
+              wallDistance,
+              rewindTick,
+              stats.range,
+            )
           : null;
         if (hit) {
-          this.pve.damage.apply(hit.zombie, hit.region, now, this.tick);
+          const before = hit.zombie.health;
+          const deathId = hit.zombie.id + ":" + hit.zombie.spawnAt;
+          if (
+            this.pve.damage.apply(
+              hit.zombie,
+              hit.region,
+              now,
+              this.tick,
+              stats,
+              playerId,
+            )
+          ) {
+            if (hit.zombie.id === this.pve.bossEntityId) {
+              this.phase6.damageBoss(playerId, before - hit.zombie.health);
+              hit.zombie.damage = this.phase6.boss!.phase === 2 ? 38 : 28;
+              hit.zombie.speed = this.phase6.boss!.phase === 2 ? 1.8 : 1.4;
+              if (hit.zombie.health === 0) {
+                this.pve.bossEntityId = null;
+                this.outcome = {
+                  result: "PHASE_COMPLETE",
+                  reason: "boss_defeated",
+                  completedWaves: this.phase6.clearedWaves,
+                };
+                this.broadcast({
+                  v: 3,
+                  type: "phase6State",
+                  snapshot: this.phase6.snapshot(),
+                });
+                this.change("ENDED");
+              }
+            } else {
+              this.phase6.recordDamage(
+                playerId,
+                before - hit.zombie.health,
+                false,
+                false,
+                playerId + ":" + message.seq,
+              );
+              if (hit.zombie.health === 0)
+                this.phase6.recordKill(
+                  playerId,
+                  deathId,
+                  hit.region === "head",
+                );
+            }
+          }
           impact.point = {
             x: origin.x + direction.x * hit.distance,
             y: origin.y + direction.y * hit.distance,
@@ -472,12 +597,16 @@ export class MatchInstance {
         const target =
           !hit && this.targets.find((t) => t.id === impact.targetId);
         if (target) {
-          target.health = Math.max(0, target.health - RIFLE.targetDamage);
+          target.health = Math.max(
+            0,
+            target.health - Math.ceil(stats.baseDamage),
+          );
           if (!target.health) target.resetAt = now + TARGET_RESET_MS;
         }
         this.broadcast({
-          v: 2,
+          v: 3,
           type: "shotConfirmed",
+          weaponId: inventory.equippedWeapon,
           playerId,
           seq: message.seq,
           origin,
@@ -497,8 +626,9 @@ export class MatchInstance {
       } catch (error) {
         if (!(error instanceof GameError)) throw error;
         peer.send({
-          v: 2,
+          v: 3,
           type: "shotRejected",
+          weaponId: inventory.equippedWeapon,
           seq: message.seq,
           code: error.code,
           weapon: { ...p.state.weapon },
@@ -510,12 +640,20 @@ export class MatchInstance {
     if (terminalState(this.state)) return;
     const now = this.now();
     this.tick++;
+    if (this.phase6.closeShop(now))
+      this.broadcast({
+        v: 3,
+        type: "phase6State",
+        snapshot: this.phase6.snapshot(),
+      });
     if (now - this.reservation.createdAt > LIMITS.maxSessionMs) {
       this.end();
       return;
     }
     if (
-      !["PLAYING", "RECONNECTING"].includes(this.state) &&
+      !["PLAYING", "RECONNECTING", "BOSS_INTRO", "BOSS_ACTIVE"].includes(
+        this.state,
+      ) &&
       now - this.reservation.createdAt > this.config.startupMs
     ) {
       this.change("CANCELLED");
@@ -524,24 +662,38 @@ export class MatchInstance {
     if (this.state === "COUNTDOWN" && now >= this.startAt)
       this.change("PLAYING");
     if (this.state === "BOSS_INTRO") {
+      if (!this.pve.startBoss(now, this.tick, this.phase6.boss!.maxHealth)) {
+        this.fail();
+        return;
+      }
       this.phase6.activateBoss(now);
       this.broadcast({
-        v: 2,
+        v: 3,
         type: "phase6State",
         snapshot: this.phase6.snapshot(),
       });
       this.change("BOSS_ACTIVE");
     }
     for (const p of this.players) {
-      if (p.state.life === "ALIVE" && completeReload(p.state.weapon, now))
+      const inventory = this.phase6.players.get(p.state.id)!;
+      const stats = resolveWeaponStats(
+        inventory.equippedWeapon,
+        inventory.upgrades[inventory.equippedWeapon] ?? 0,
+      );
+      if (
+        p.state.life === "ALIVE" &&
+        completeReload(p.state.weapon, now, stats)
+      )
         p.peer?.send({
-          v: 2,
+          v: 3,
           type: "weaponState",
+          weaponId: inventory.equippedWeapon,
           playerId: p.state.id,
           weapon: { ...p.state.weapon },
           event: "reloadCompleted",
         });
-      if (!["PLAYING", "RECONNECTING"].includes(this.state)) continue;
+      if (!["PLAYING", "RECONNECTING", "BOSS_ACTIVE"].includes(this.state))
+        continue;
       const input =
         p.state.connected && p.state.ready ? p.inputs.shift() : undefined;
       const neutral = neutralInput(
@@ -589,7 +741,7 @@ export class MatchInstance {
       }
     if (this.tick % (this.config.tickRate / this.config.snapshotRate) === 0)
       this.broadcast({
-        v: 2,
+        v: 3,
         type: "worldSnapshot",
         snapshot: this.snapshot(),
       });
@@ -597,7 +749,10 @@ export class MatchInstance {
   end() {
     if (terminalState(this.state)) return;
     this.change(
-      this.state === "PLAYING" || this.state === "RECONNECTING"
+      this.state === "PLAYING" ||
+        this.state === "RECONNECTING" ||
+        this.state === "BOSS_ACTIVE" ||
+        this.state === "BOSS_INTRO"
         ? "ENDED"
         : "CANCELLED",
     );

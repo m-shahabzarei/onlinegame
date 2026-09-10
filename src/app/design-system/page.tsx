@@ -1,12 +1,14 @@
-import type { Metadata } from "next";
+import { getRequestLocale, createTranslator } from "@/i18n";
 
 import { DesignSystemShowcase } from "@/components/design-system/design-system-showcase";
 
-export const metadata: Metadata = {
-  title: "Design system",
-  description:
-    "Internal Phase 1 preview of TwoPlayer design tokens and interface primitives.",
-};
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.designSystem"),
+    description: t("pages.internalPhase1PreviewOfTwoPlayerDesignTokensAnd"),
+  };
+}
 
 export default function DesignSystemPage() {
   return <DesignSystemShowcase />;

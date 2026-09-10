@@ -28,6 +28,7 @@ export interface PvEOptions {
   rules?: PvERules;
   waves?: readonly WaveConfig[];
   profile?: Phase6Profile;
+  intermissionMs?: number;
 }
 export class PvEReplicationSystem {
   static snapshot(sim: PvESimulation, diagnostics: boolean): PvESnapshot {
@@ -89,6 +90,7 @@ export class PvESimulation {
     stuckRecoveries: 0,
   };
   private nextSpawn = 0;
+  bossEntityId: string | null = null;
   private lastNow = 0;
   readonly emit: EmitEvent = (kind, values = {}) => {
     const event: PvEEvent = {
@@ -106,7 +108,7 @@ export class PvESimulation {
       detail: "",
       ...values,
     };
-    this.send({ v: 2, type: "pveEvent", event });
+    this.send({ v: 3, type: "pveEvent", event });
   };
   constructor(
     readonly players: readonly PlayerState[],
@@ -124,7 +126,7 @@ export class PvESimulation {
       random,
       (wave) => {
         if (wave.state === "INTERMISSION") {
-          this.revive.cancel("Wave cleared");
+          this.revive.cancel("wave_cleared");
           this.life.returnAtIntermission(
             this.players,
             this.physics,
@@ -132,16 +134,24 @@ export class PvESimulation {
             this.now(),
           );
         }
-        if (waveTerminal(wave.state)) this.revive.cancel("Run ended");
+        if (waveTerminal(wave.state)) this.revive.cancel("run_ended");
         this.send({
-          v: 2,
+          v: 3,
           type: "waveStateChanged",
           wave,
           seq: ++this.eventSeq,
         });
-        if (waveTerminal(wave.state)) this.finished(wave);
+        if (waveTerminal(wave.state) || wave.state === "INTERMISSION")
+          this.finished(wave);
       },
-      options.waves ?? (options.profile === "phase6-production" ? PHASE6_WAVES : WAVES),
+      options.waves ??
+        (options.profile === "phase6-production"
+          ? PHASE6_WAVES.map((w) => ({
+              ...w,
+              intermissionMs: options.intermissionMs ?? 30000,
+            }))
+          : WAVES),
+      options.profile === "phase6-production" && !options.waves,
     );
     this.spawning = new SpawnDirector(
       this.navigation,
@@ -170,9 +180,47 @@ export class PvESimulation {
   }
   get combat() {
     return (
+      !!this.bossEntityId ||
       this.waves.state.state === "ACTIVE" ||
       this.waves.state.state === "CLEARING"
     );
+  }
+  startBoss(now: number, tick: number, health: number) {
+    const point = this.spawning.select(
+      ZOMBIES.get("brute").radius,
+      this.players,
+      [],
+      now,
+    );
+    if (!point) return null;
+    const boss = this.entities.spawn(
+      "brute",
+      point,
+      this.waves.config,
+      now,
+      tick,
+    );
+    boss.health = boss.maxHealth = health;
+    boss.damage = 28;
+    boss.speed = 1.4;
+    this.bossEntityId = boss.id;
+    this.emit("zombieSpawned", {
+      entityId: boss.id,
+      revision: boss.revision,
+      position: { ...point },
+      detail: "brute",
+    });
+    return boss;
+  }
+  private teamDefeated() {
+    if (this.bossEntityId) {
+      this.bossEntityId = null;
+      this.finished({
+        ...this.waves.state,
+        state: "TEAM_DEFEATED",
+        reason: "no_living_teammate",
+      });
+    } else this.waves.change("TEAM_DEFEATED", 0, "no_living_teammate");
   }
   /** Per-player reconnect deadlines come from the match connection owner, never the client. */
   update(
@@ -182,7 +230,7 @@ export class PvESimulation {
     reconnectDeadline: (id: string) => number,
   ) {
     this.tick = tick;
-    if (waveTerminal(this.waves.state.state)) return;
+    if (waveTerminal(this.waves.state.state) && !this.bossEntityId) return;
     const elapsed = this.lastNow ? Math.max(0, now - this.lastNow) : 0;
     this.lastNow = now;
     if (this.combat || this.waves.state.state === "INTERMISSION") {
@@ -203,11 +251,7 @@ export class PvESimulation {
             reconnectDeadline(p.id) > now,
         );
       if (!living && !this.recoveryPending) {
-        this.waves.change(
-          "TEAM_DEFEATED",
-          0,
-          "No living teammate can continue or revive",
-        );
+        this.teamDefeated();
         return;
       }
       this.life.bleed(this.players, now, this.recoveryPending ? elapsed : 0);
@@ -218,7 +262,7 @@ export class PvESimulation {
       );
       if (this.recoveryPending) return;
     }
-    this.waves.update(now, this.entities.alive);
+    if (!this.bossEntityId) this.waves.update(now, this.entities.alive);
     if (!this.combat) return;
     if (
       this.waves.queue.length &&
@@ -258,11 +302,7 @@ export class PvESimulation {
             attempts: this.spawning.attempts,
           }),
         );
-        this.waves.change(
-          "ERROR",
-          0,
-          "No valid enemy spawn after bounded retries",
-        );
+        this.waves.change("ERROR", 0, "spawn_exhausted");
         return;
       }
     }
@@ -271,16 +311,11 @@ export class PvESimulation {
     this.metrics.aiMs = performance.now() - began;
     // A lethal attack can make recovery impossible during this tick: stop immediately.
     if (!this.players.some(eligiblePlayer)) {
-      this.revive.cancel("No eligible reviver");
+      this.revive.cancel("no_eligible_reviver");
       this.recoveryPending = this.players.some(
         (p) => p.life === "ALIVE" && reconnectDeadline(p.id) > now,
       );
-      if (!this.recoveryPending)
-        this.waves.change(
-          "TEAM_DEFEATED",
-          0,
-          "No living teammate can continue or revive",
-        );
+      if (!this.recoveryPending) this.teamDefeated();
     }
     for (let i = this.entities.entities.length - 1; i >= 0; i--) {
       const z = this.entities.entities[i]!;
@@ -303,7 +338,7 @@ export class PvESimulation {
       this.waves.change(
         error ? "ERROR" : "CANCELLED",
         0,
-        error ? "Simulation failed safely" : "Session ended",
+        error ? "simulation_failed" : "session_ended",
       );
   }
   snapshot() {
@@ -313,7 +348,7 @@ export class PvESimulation {
     );
   }
   dispose() {
-    this.revive.cancel("Match disposed");
+    this.revive.cancel("match_disposed");
     this.entities.dispose();
     this.navigation.dispose();
   }

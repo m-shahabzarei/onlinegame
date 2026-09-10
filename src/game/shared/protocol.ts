@@ -11,7 +11,12 @@ import {
   PROTOCOL_VERSION,
   simulationConfigSchema,
 } from "./config";
-import { phase6SnapshotSchema } from "./phase6";
+import {
+  combatWeaponSchema,
+  phase6SnapshotSchema,
+  shopResultCodeSchema,
+  weaponSlotSchema,
+} from "./phase6";
 import { gameModeSchema } from "./mode";
 
 const id = z.string().min(1).max(128);
@@ -66,6 +71,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     .object({
       ...version,
       type: z.literal("fire"),
+      triggerSeq: counter,
       seq: counter,
       tick: counter,
       viewTick: counter.optional(),
@@ -73,6 +79,9 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ ...version, type: z.literal("reload"), seq: counter }).strict(),
+  z
+    .object({ ...version, type: z.literal("triggerRelease"), seq: counter })
+    .strict(),
   z
     .object({
       ...version,
@@ -92,6 +101,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
       type: z.literal("purchaseWeapon"),
       requestId: id,
       weaponId: id,
+      replaceWeaponId: id.optional(),
     })
     .strict(),
   z
@@ -128,6 +138,8 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
       type: z.literal("equipWeapon"),
       requestId: id,
       weaponId: id,
+      slot: weaponSlotSchema,
+      seq: counter,
     })
     .strict(),
   z
@@ -162,16 +174,7 @@ export const matchStateSchema = z.enum([
   "ERROR",
 ]);
 export type MatchState = z.infer<typeof matchStateSchema>;
-export const weaponSchema = z
-  .object({
-    magazine: counter,
-    reserve: counter,
-    reloadAt: time,
-    nextFireAt: time,
-    lastShot: counter,
-    lastReload: counter,
-  })
-  .strict();
+export const weaponSchema = combatWeaponSchema;
 export type WeaponState = z.infer<typeof weaponSchema>;
 export const motionSchema = z
   .object({
@@ -294,6 +297,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     .object({
       ...version,
       type: z.literal("shotConfirmed"),
+      weaponId: id,
       playerId: id,
       seq: counter,
       origin: vectorSchema,
@@ -315,6 +319,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     .object({
       ...version,
       type: z.literal("shotRejected"),
+      weaponId: id,
       seq: counter,
       code: errorCodeSchema,
       weapon: weaponSchema,
@@ -324,9 +329,19 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     .object({
       ...version,
       type: z.literal("weaponState"),
+      weaponId: id,
       playerId: id,
       weapon: weaponSchema,
       event: z.enum(["reloadStarted", "reloadCompleted", "unchanged"]),
+    })
+    .strict(),
+  z
+    .object({
+      ...version,
+      type: z.literal("shopResult"),
+      requestId: id,
+      code: shopResultCodeSchema,
+      snapshot: phase6SnapshotSchema,
     })
     .strict(),
   z
@@ -428,7 +443,7 @@ export function neutralInput(
   pitch = 0,
 ): PlayerInput {
   return {
-    v: 2,
+    v: PROTOCOL_VERSION,
     type: "playerInput",
     seq,
     tick,

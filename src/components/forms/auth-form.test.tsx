@@ -92,7 +92,7 @@ describe("GuestForm", () => {
       screen.getByRole("list", { name: /guest mode limitations/i }),
     ).toHaveTextContent(/multiplayer rooms/i);
     expect(
-      screen.getByRole("button", { name: /continue as guest/i }),
+      screen.getByRole("button", { name: /continue as (a )?guest/i }),
     ).toBeEnabled();
   });
 });
@@ -103,7 +103,7 @@ describe("LogoutButton", () => {
       ok: false as const,
       error: {
         code: "AUTH_UNAVAILABLE",
-        message: "The session could not be revoked. Try again.",
+        message: "logoutFailure",
       },
     }));
     render(<LogoutButton action={failedLogout} />);
@@ -111,7 +111,7 @@ describe("LogoutButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /could not be revoked/i,
+      /could not revoke this session/i,
     );
     expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
   });

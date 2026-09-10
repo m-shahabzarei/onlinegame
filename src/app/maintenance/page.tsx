@@ -1,23 +1,36 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-export default function MaintenancePage() {
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.scheduledMaintenance"),
+    description: t(
+      "pages.twoPlayerIsTemporarilyUnavailableWhileWeProtectActiveSessions",
+    ),
+  };
+}
+export default async function MaintenancePage() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-16">
       <section className="max-w-lg text-center">
         <p className="text-primary font-mono text-xs font-semibold tracking-[0.2em] uppercase">
-          Scheduled maintenance
+          {t("pages.scheduledMaintenance")}
         </p>
         <h1 className="font-display text-foreground mt-4 text-4xl font-semibold">
-          We are tuning the connection
+          {t("pages.weAreTuningTheConnection")}
         </h1>
         <p className="text-muted-foreground mt-4 leading-7">
-          TwoPlayer is temporarily unavailable while we protect active sessions.
-          Please try again shortly.
+          {t(
+            "pages.twoPlayerIsTemporarilyUnavailableWhileWeProtectActiveSessions",
+          )}
         </p>
         <Link className="mt-8 inline-flex" href="/">
-          <Button type="button">Try again</Button>
+          <Button type="button">{t("pages.tryAgain")}</Button>
         </Link>
       </section>
     </main>

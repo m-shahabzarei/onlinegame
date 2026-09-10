@@ -1,5 +1,4 @@
 import { FALLBACK_SPAWN, SPAWNS } from "../../../src/game/shared/arena";
-import { RIFLE } from "../../../src/game/shared/config";
 import {
   createMotion,
   type ArenaPhysics,
@@ -106,8 +105,7 @@ export class PlayerLifeStateSystem {
           position: { ...spawn },
         });
       }
-      // Free between-wave reserve resupply of the existing rifle; no item or economy.
-      p.weapon.reserve = Math.max(p.weapon.reserve, RIFLE.reserve);
+      // Ammunition stays in the authoritative inventory; the shop sells reserve refills.
       p.weapon.reloadAt = 0;
     }
   }
@@ -190,7 +188,7 @@ export class ReviveSystem {
     const reviver = players.find((p) => p.id === r.reviverId),
       target = players.find((p) => p.id === r.targetId);
     if (!active || now > this.heldUntil || !this.valid(reviver, target, now)) {
-      this.cancel("Interaction interrupted");
+      this.cancel("interaction_interrupted");
       return;
     }
     if (now < r.endsAt) return;

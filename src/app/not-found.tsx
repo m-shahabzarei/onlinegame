@@ -1,9 +1,12 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { buttonVariants, EmptyState } from "@/components/ui";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <main
       id="main-content"
@@ -11,13 +14,13 @@ export default function NotFound() {
     >
       <EmptyState
         className="w-full"
-        title="Page not found"
+        title={t("pages.pageNotFound")}
         titleAs="h1"
-        description="We could not find that TwoPlayer page. Check the address or return to discovery."
+        description={t("pages.weCouldNotFindThatTwoPlayerPageCheckThe")}
         action={
           <Link className={buttonVariants()} href="/">
             <ArrowLeft aria-hidden="true" className="size-4" />
-            Back to discover
+            {t("pages.backToDiscover")}
           </Link>
         }
       />

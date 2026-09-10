@@ -1,10 +1,13 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { CatalogLoadingGrid } from "@/components/catalog/catalog-states";
 
-export default function GameDetailsLoading(): React.JSX.Element {
+export default async function GameDetailsLoading(): Promise<React.JSX.Element> {
+  const t = createTranslator(await getRequestLocale());
+
   return (
     <div className="min-h-dvh px-4 py-10 sm:px-6 lg:py-14">
       <p className="sr-only" role="status" aria-live="polite">
-        Loading game details…
+        {t("pages.loadingGameDetails")}
       </p>
       <div className="mx-auto w-full max-w-7xl">
         <div className="bg-surface-interactive mb-8 h-11 w-36 animate-pulse rounded-md motion-reduce:animate-none" />

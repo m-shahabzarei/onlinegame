@@ -20,6 +20,8 @@ vi.mock("./use-lobby-connection", () => ({
   useLobbyConnection: () => ({ connection: mocks.connection, retry: vi.fn() }),
 }));
 import { RoomBrowser } from "./room-browser";
+import { LocaleProvider } from "@/i18n/provider";
+import { LobbyClientError } from "./client";
 
 beforeEach(() => {
   mocks.connection = "CONNECTED";
@@ -28,6 +30,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("room browser recovery", () => {
+  it("presents a rejected join in Persian without exposing the internal code", async () => {
+    const user = userEvent.setup();
+    mocks.command.mockRejectedValue(new LobbyClientError("ROOM_FULL"));
+    render(
+      <LocaleProvider locale="fa">
+        <RoomBrowser slug="nightfall-protocol" name="Nightfall Protocol" />
+      </LocaleProvider>,
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "کد دعوت دارید؟" }),
+      "ABCD2345",
+    );
+    await user.click(screen.getByRole("button", { name: "ورود با کد" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "اتاق پر است. اتاق دیگری انتخاب کنید یا اتاق بسازید.",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent("ROOM_FULL");
+  });
   it("gates creation and joining while disconnected and retains the invite input", async () => {
     const user = userEvent.setup();
     const view = render(

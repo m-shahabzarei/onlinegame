@@ -1,4 +1,6 @@
 "use client";
+import { actionMessage } from "@/i18n/action-messages";
+import { useLocale, useTranslations } from "@/i18n/provider";
 
 import { useActionState, useCallback, useState } from "react";
 
@@ -16,7 +18,6 @@ import type { FormAction } from "./auth-form";
 import { initialFormActionState } from "./auth-form";
 import { useUnsavedChangesWarning } from "./use-unsaved-changes-warning";
 import { clientTranslate } from "@/i18n/client";
-import type { Locale } from "@/i18n/messages";
 
 export interface SettingsFormValues {
   readonly locale?: string | null;
@@ -30,8 +31,10 @@ export interface SettingsFormProps {
 }
 
 export function SettingsForm({ action, values }: SettingsFormProps) {
+  const locale = useLocale();
+  const t = useTranslations();
+
   const [dirty, setDirty] = useState(false);
-  const locale = (values.locale === "fa" ? "fa" : "en") as Locale;
   const copy = {
     language: clientTranslate(locale, "navigation.language"),
     motion: clientTranslate(locale, "settings.motion"),
@@ -66,11 +69,8 @@ export function SettingsForm({ action, values }: SettingsFormProps) {
   return (
     <Card variant="elevated">
       <CardHeader>
-        <CardTitle as="h2">Preferences</CardTitle>
-        <CardDescription>
-          Tune the platform to your setup. These preferences apply to your
-          account on supported devices.
-        </CardDescription>
+        <CardTitle as="h2">{t("platform.preferences")}</CardTitle>
+        <CardDescription>{t("platform.preferencesHelp")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid gap-6" noValidate>
@@ -84,10 +84,10 @@ export function SettingsForm({ action, values }: SettingsFormProps) {
               setDirty(true);
             }}
             options={[
-              { value: "en", label: "English" },
-              { value: "fa", label: "فارسی (Persian)" },
+              { value: "en", label: t("platform.english") },
+              { value: "fa", label: t("platform.persian") },
             ]}
-            description="More languages will be added as localization expands."
+            description={t("platform.languageHelp")}
           />
 
           <fieldset className="grid gap-3">
@@ -155,7 +155,7 @@ export function SettingsForm({ action, values }: SettingsFormProps) {
               className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border px-3 py-2 text-sm"
               role="alert"
             >
-              {state.error.message}
+              {actionMessage(locale, state.error.message, state.error.code)}
             </p>
           ) : null}
           {state.ok && state.message ? (
@@ -164,7 +164,7 @@ export function SettingsForm({ action, values }: SettingsFormProps) {
               role="status"
               aria-live="polite"
             >
-              {state.message}
+              {actionMessage(locale, state.message)}
             </p>
           ) : null}
 

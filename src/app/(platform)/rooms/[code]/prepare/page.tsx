@@ -1,13 +1,17 @@
+import { getRequestLocale, createTranslator } from "@/i18n";
 import { getCurrentSession } from "@/server/dal/session";
 import { normalizeRoomCode } from "@/domain/lobby";
 import { RoomLobby } from "@/components/lobby/room-lobby";
 import { SessionRequired } from "@/components/lobby/shared";
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "Session prepared",
-  referrer: "no-referrer" as const,
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  const t = createTranslator(await getRequestLocale());
+  return {
+    title: t("pages.sessionPrepared"),
+    referrer: "no-referrer" as const,
+    robots: { index: false, follow: false },
+  };
+}
 export default async function PreparationPage({
   params,
 }: {

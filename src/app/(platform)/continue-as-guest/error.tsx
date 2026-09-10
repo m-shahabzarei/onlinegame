@@ -1,28 +1,32 @@
 "use client";
+import { createTranslator } from "@/i18n/client";
+import { useLocale } from "@/i18n/provider";
 
 import Link from "next/link";
 
 import { Button, buttonVariants, ErrorState } from "@/components/ui";
 
 export default function GuestAccessError({
-  reset,
+  retry,
 }: {
-  readonly reset: () => void;
+  readonly retry: () => void;
 }) {
+  const t = createTranslator(useLocale());
+
   return (
     <section className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
       <ErrorState
         titleAs="h1"
-        title="Guest access is unavailable"
-        description="We could not prepare a temporary guest session. Retry now, or browse the public game catalog without starting a guest session."
+        title={t("pages.guestAccessIsUnavailable")}
+        description={t("pages.weCouldNotPrepareATemporaryGuestSessionRetry")}
         action={
           <div className="flex flex-wrap justify-center gap-3">
-            <Button onClick={reset}>Retry guest access</Button>
+            <Button onClick={retry}>{t("pages.retryGuestAccess")}</Button>
             <Link
               className={buttonVariants({ variant: "outline" })}
               href="/games"
             >
-              Browse games
+              {t("pages.browseGames")}
             </Link>
           </div>
         }

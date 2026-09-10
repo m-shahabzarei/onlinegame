@@ -1,4 +1,6 @@
 "use client";
+import { actionMessage, localizedFieldErrors } from "@/i18n/action-messages";
+import { useLocale, useTranslations } from "@/i18n/provider";
 
 import {
   useActionState,
@@ -57,6 +59,9 @@ function initials(displayName: string, username: string): string {
 }
 
 export function ProfileForm({ action, user }: ProfileFormProps) {
+  const locale = useLocale();
+  const t = useTranslations();
+
   const [dirty, setDirty] = useState(false);
   const [draft, setDraft] = useState({
     username: user.username,
@@ -77,7 +82,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
     submitProfile,
     initialFormActionState,
   );
-  const errors = state.error?.fieldErrors;
+  const errors = localizedFieldErrors(locale, state.error?.fieldErrors);
   const bioError = firstFieldError(errors, "bio");
 
   useUnsavedChangesWarning(dirty);
@@ -93,11 +98,8 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
   return (
     <Card variant="elevated">
       <CardHeader>
-        <CardTitle as="h2">Profile details</CardTitle>
-        <CardDescription>
-          Keep the identity your teammates will recognize. You can change these
-          details later.
-        </CardDescription>
+        <CardTitle as="h2">{t("platform.profileDetails")}</CardTitle>
+        <CardDescription>{t("platform.profileHelp")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -111,12 +113,16 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
               {draft.avatarUrl ? (
                 <AvatarImage
                   src={draft.avatarUrl}
-                  alt={`${draft.displayName || draft.username} avatar`}
+                  alt={t("platform.avatar", {
+                    name: draft.displayName || draft.username,
+                  })}
                 />
               ) : null}
               <AvatarFallback
                 role="img"
-                aria-label={`${draft.displayName || draft.username} initials avatar`}
+                aria-label={t("platform.initialsAvatar", {
+                  name: draft.displayName || draft.username,
+                })}
               >
                 {initials(draft.displayName, draft.username)}
               </AvatarFallback>
@@ -129,7 +135,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
                 @{draft.username}
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Use a stable image URL or leave blank for initials.
+                {t("platform.avatarHint")}
               </p>
             </div>
           </div>
@@ -138,8 +144,9 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
             autoComplete="username"
             required
             disabled={pending}
-            label="Username"
+            label={t("platform.username")}
             name="username"
+            dir="ltr"
             value={draft.username}
             onChange={(event) => {
               setDraft((current) => ({
@@ -153,14 +160,14 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
             {...(firstFieldError(errors, "username")
               ? { error: firstFieldError(errors, "username") }
               : {})}
-            description="3–32 characters: letters, numbers, and underscores."
+            description={t("platform.usernameHint")}
           />
 
           <Input
             autoComplete="name"
             required
             disabled={pending}
-            label="Display name"
+            label={t("platform.displayName")}
             name="displayName"
             value={draft.displayName}
             onChange={(event) => {
@@ -177,9 +184,10 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
           />
 
           <Input
-            label="Avatar URL"
+            label={t("platform.avatarUrl")}
             disabled={pending}
             name="avatarUrl"
+            dir="ltr"
             type="url"
             inputMode="url"
             value={draft.avatarUrl}
@@ -193,7 +201,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
             {...(firstFieldError(errors, "avatarUrl")
               ? { error: firstFieldError(errors, "avatarUrl") }
               : {})}
-            description="Optional. For best results use a square image hosted over HTTPS."
+            description={t("platform.avatarHelp")}
           />
 
           <div className="grid gap-2">
@@ -201,9 +209,9 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
               className="text-foreground text-sm font-semibold"
               htmlFor="profile-bio"
             >
-              Short bio{" "}
+              {t("platform.bio")}{" "}
               <span className="text-muted-foreground font-normal">
-                (optional)
+                {t("platform.optional")}
               </span>
             </label>
             <textarea
@@ -226,7 +234,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
               aria-invalid={bioError ? true : undefined}
             />
             <p id="profile-bio-help" className="text-muted-foreground text-sm">
-              A short introduction, up to 280 characters.
+              {t("platform.bioHelp")}
             </p>
             {bioError ? (
               <p
@@ -244,7 +252,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
               className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border px-3 py-2 text-sm"
               role="alert"
             >
-              {state.error.message}
+              {actionMessage(locale, state.error.message, state.error.code)}
             </p>
           ) : null}
           {state.ok && state.message ? (
@@ -253,7 +261,7 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
               role="status"
               aria-live="polite"
             >
-              {state.message}
+              {actionMessage(locale, state.message)}
             </p>
           ) : null}
 
@@ -261,9 +269,9 @@ export function ProfileForm({ action, user }: ProfileFormProps) {
             <Button
               type="submit"
               loading={pending}
-              loadingText="Saving profile…"
+              loadingText={t("platform.savingProfile")}
             >
-              Save profile
+              {t("platform.saveProfile")}
             </Button>
           </div>
         </form>

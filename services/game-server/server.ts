@@ -98,7 +98,7 @@ export async function createGameplayService(options: ServiceOptions) {
       res.end(
         JSON.stringify({
           ok: !closing,
-          protocol: 2,
+          protocol: 3,
           matches: matches.size,
           serverEpoch,
         }),
@@ -130,7 +130,7 @@ export async function createGameplayService(options: ServiceOptions) {
         "Cache-Control": "public, max-age=60",
       });
       res.end(
-        JSON.stringify({ service: "twoplayer-game-server", protocol: 2 }),
+        JSON.stringify({ service: "twoplayer-game-server", protocol: 3 }),
       );
       return;
     }
@@ -300,8 +300,8 @@ export async function createGameplayService(options: ServiceOptions) {
         metrics.commandsRejected++;
         peer.send(
           playerId
-            ? { v: 2, type: "connectionWarning", code }
-            : { v: 2, type: "serverError", code },
+            ? { v: 3, type: "connectionWarning", code }
+            : { v: 3, type: "serverError", code },
         );
         const repeatedViolation =
           ["INVALID_MESSAGE", "PROTOCOL_MISMATCH", "RATE_LIMITED"].includes(

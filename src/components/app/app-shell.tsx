@@ -1,3 +1,4 @@
+import { createTranslator } from "@/i18n/client";
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -17,14 +18,11 @@ export interface AppShellProps {
 }
 
 /** Shared platform chrome with request-scoped account presentation preferences. */
-export async function AppShell({
-  children,
-  eyebrow = "TACTICAL CO-OP PLATFORM",
-  user,
-}: AppShellProps) {
+export async function AppShell({ children, eyebrow, user }: AppShellProps) {
   const resolvedUser =
     user === undefined ? ((await getCurrentSession())?.user ?? null) : user;
   const locale = await getRequestLocale();
+  const t = createTranslator(locale);
 
   return (
     <div
@@ -52,7 +50,7 @@ export async function AppShell({
                 TwoPlayer
               </span>
               <span className="text-muted-foreground mt-1 hidden font-mono text-[0.6rem] tracking-[0.18em] uppercase lg:block">
-                {eyebrow}
+                {eyebrow ?? t("platform.eyebrow")}
               </span>
             </span>
           </Link>
@@ -63,9 +61,9 @@ export async function AppShell({
       <Onboarding />
       <footer className="border-border/70 mx-auto mt-20 w-full max-w-screen-2xl border-t px-4 py-8 sm:px-6 lg:px-8 2xl:px-12">
         <div className="text-muted-foreground flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p>TwoPlayer · cooperative play, built with intent.</p>
+          <p>{t("platform.footer")}</p>
           <p className="font-mono text-xs tracking-[0.12em] uppercase">
-            Rooms and gameplay are live · Play with care
+            {t("platform.footerStatus")}
           </p>
         </div>
         <div className="mt-4">

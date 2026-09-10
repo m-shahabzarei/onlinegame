@@ -15,7 +15,7 @@ it("sends leave and closes timers even when trusted HTTP cleanup times out", asy
   const network = new GameplayNetwork("match", vi.fn(), vi.fn());
   const send = vi.spyOn(network, "send").mockReturnValue(true);
   await expect(network.leave()).resolves.toBeUndefined();
-  expect(send).toHaveBeenCalledWith({ v: 2, type: "leaveMatch" });
+  expect(send).toHaveBeenCalledWith({ v: 3, type: "leaveMatch" });
   expect(fetch).toHaveBeenCalledWith(
     "/api/gameplay/match",
     expect.objectContaining({

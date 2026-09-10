@@ -1,4 +1,6 @@
 "use client";
+import { createTranslator } from "@/i18n/client";
+import { useLocale } from "@/i18n/provider";
 
 import { useEffect } from "react";
 
@@ -6,11 +8,13 @@ import { Button, ErrorState } from "@/components/ui";
 
 export default function ErrorBoundary({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
+  const t = createTranslator(useLocale());
+
   useEffect(() => {
     console.error("Application route error", error);
   }, [error]);
@@ -22,10 +26,10 @@ export default function ErrorBoundary({
     >
       <ErrorState
         className="w-full"
-        title="Interface unavailable"
+        title={t("pages.interfaceUnavailable")}
         titleAs="h1"
-        description="The page could not be rendered. Retry the request; if the problem continues, check the server logs."
-        action={<Button onClick={reset}>Retry</Button>}
+        description={t("pages.thePageCouldNotBeRenderedRetryTheRequest")}
+        action={<Button onClick={retry}>{t("pages.retry")}</Button>}
       />
     </main>
   );

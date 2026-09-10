@@ -1,2 +1,2 @@
-/* Phase 5 extends the existing authority benchmark with mixed PvE load. */
+/* Shared protocol-3 authority benchmark with resolved weapons and mixed PvE load. */
 import "./profile-pve.mjs";

@@ -1,4 +1,7 @@
-export const messages = {
+import { platformMessages } from "./platform-messages";
+import { gameMessages } from "./game-messages";
+import { pageMessages } from "./page-messages";
+const baseMessages = {
   en: {
     navigation: {
       games: "Games",
@@ -29,7 +32,7 @@ export const messages = {
       reduceMotionHelp: "Minimize non-essential animation and transitions.",
       audio: "Audio",
       sound: "Sound effects",
-      soundHelp: "A placeholder preference for future in-game audio.",
+      soundHelp: "Enable or mute gameplay sound effects.",
       save: "Save preferences",
       saving: "Saving preferences…",
     },
@@ -142,7 +145,7 @@ export const messages = {
       reduceMotionHelp: "پویانمایی‌های غیرضروری را کم کنید.",
       audio: "صدا",
       sound: "جلوه‌های صوتی",
-      soundHelp: "تنظیمات صدای بازی.",
+      soundHelp: "جلوه‌های صوتی بازی را فعال یا بی‌صدا کنید.",
       save: "ذخیره تنظیمات",
       saving: "در حال ذخیره…",
     },
@@ -226,35 +229,41 @@ export const messages = {
   },
 } as const;
 
-export type Locale = keyof typeof messages;
-export type TranslationKey =
-  | "navigation.games"
-  | "navigation.profile"
-  | "navigation.settings"
-  | "navigation.login"
-  | "navigation.guest"
-  | "navigation.register"
-  | "navigation.logout"
-  | "navigation.language"
-  | "navigation.skipToContent"
-  | "game.playSolo"
-  | "game.playCoop"
-  | "game.soloDescription"
-  | "game.coopDescription"
-  | "loading.generic"
-  | "loading.lobby"
-  | "loading.rooms"
-  | "loading.gameplay"
-  | "settings.motion"
-  | "settings.reduceMotion"
-  | "settings.reduceMotionHelp"
-  | "settings.audio"
-  | "settings.sound"
-  | "settings.soundHelp"
-  | "settings.save"
-  | "settings.saving"
-  | "metadata.title"
-  | "metadata.description"
-  | `auth.${keyof typeof messages.en.auth & string}`
-  | `common.${keyof typeof messages.en.common & string}`
-  | `shop.${keyof typeof messages.en.shop & string}`;
+export const messages = {
+  en: {
+    ...baseMessages.en,
+    ...platformMessages.en,
+    ...gameMessages.en,
+    ...pageMessages.en,
+  },
+  fa: {
+    ...baseMessages.fa,
+    ...platformMessages.fa,
+    ...gameMessages.fa,
+    ...pageMessages.fa,
+  },
+} as const;
+export type Locale = "en" | "fa";
+type LeafPaths<T> = {
+  [K in keyof T & string]: T[K] extends
+    string | { readonly one: string; readonly other: string }
+    ? K
+    : `${K}.${LeafPaths<T[K]>}`;
+}[keyof T & string];
+export type TranslationKey = LeafPaths<typeof messages.en>;
+type PathValue<T, P extends string> = P extends `${infer Head}.${infer Tail}`
+  ? Head extends keyof T
+    ? PathValue<T[Head], Tail>
+    : never
+  : P extends keyof T
+    ? T[P]
+    : never;
+export type TranslationValue<K extends TranslationKey> = PathValue<
+  typeof messages.en,
+  K
+>;
+type CatalogSchema<T> = {
+  [K in keyof T]: T[K] extends string ? string : CatalogSchema<T[K]>;
+};
+const persianSchema: CatalogSchema<typeof messages.en> = messages.fa;
+void persianSchema;

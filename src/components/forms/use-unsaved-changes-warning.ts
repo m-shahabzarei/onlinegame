@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
-
-const DEFAULT_MESSAGE =
-  "You have unsaved changes. Leave this page and discard them?";
+import { useEffect, useRef } from "react";
+import { useTranslations } from "@/i18n/provider";
 const HISTORY_GUARD_KEY = "__twoplayerUnsavedChangesGuard";
 
 /** Warn for full-page exits and intercept same-origin client navigation. */
 export function useUnsavedChangesWarning(
   dirty: boolean,
-  message = DEFAULT_MESSAGE,
+  explicitMessage?: string,
 ): void {
+  const t = useTranslations();
+  const message = explicitMessage ?? t("platform.unsavedChanges");
+  const messageRef = useRef(message);
+  useEffect(() => {
+    messageRef.current = message;
+  }, [message]);
   useEffect(() => {
     if (!dirty) return;
 
@@ -65,7 +69,7 @@ export function useUnsavedChangesWarning(
           bypassElement = null;
           return;
         }
-        if (!window.confirm(message)) {
+        if (!window.confirm(messageRef.current)) {
           event.preventDefault();
           event.stopPropagation();
           return;
@@ -105,7 +109,7 @@ export function useUnsavedChangesWarning(
         destination.search === window.location.search;
       if (staysOnDocument) return;
 
-      if (!window.confirm(message)) {
+      if (!window.confirm(messageRef.current)) {
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -124,7 +128,7 @@ export function useUnsavedChangesWarning(
     const handlePopState = () => {
       if (allowHistoryNavigation) return;
 
-      if (window.confirm(message)) {
+      if (window.confirm(messageRef.current)) {
         allowHistoryNavigation = true;
         window.history.back();
         return;
@@ -157,5 +161,5 @@ export function useUnsavedChangesWarning(
         window.history.back();
       }
     };
-  }, [dirty, message]);
+  }, [dirty]);
 }

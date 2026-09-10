@@ -44,7 +44,7 @@ describe("authoritative solo mode", () => {
       match.join(claims, peer);
       expect(match.state).toBe("LOADING");
       match.command("pa", peer, {
-        v: 2,
+        v: 3,
         type: "clientReady",
         mapId: "quarantine-yard",
         mapVersion: 2,
@@ -53,6 +53,10 @@ describe("authoritative solo mode", () => {
       now += 20;
       match.step();
       expect(match.state).toBe("PLAYING");
+      expect(match.phase6.profile).toBe("phase6-production");
+      expect(
+        match.pve.waves.configs.every((w) => w.intermissionMs === 30000),
+      ).toBe(true);
       expect(messages.find((m) => m.type === "welcome")).toMatchObject({
         mode: "solo",
       });

@@ -1,3 +1,6 @@
+"use client";
+import { useTranslations } from "@/i18n/provider";
+
 import type { CatalogGame } from "@/domain/catalog";
 import { cn } from "@/lib/cn";
 
@@ -12,9 +15,11 @@ export function CatalogGrid({
   className,
   games,
 }: CatalogGridProps): React.JSX.Element {
+  const t = useTranslations();
+
   return (
     <div
-      aria-label="Game catalog"
+      aria-label={t("platform.catalogLabel")}
       className={cn(
         "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3",
         className,

@@ -1,4 +1,6 @@
 "use client";
+import { useLocale } from "@/i18n/provider";
+import { createTranslator } from "@/i18n/client";
 
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -36,7 +38,11 @@ function initials(user: SafeUser) {
     .toUpperCase();
 }
 
-export function MobileNav({ user, locale = "en" }: MobileNavProps) {
+export function MobileNav({ user, locale: explicitLocale }: MobileNavProps) {
+  const contextLocale = useLocale();
+  const locale = explicitLocale ?? contextLocale;
+  const t = createTranslator(locale);
+
   const copy = {
     games: clientTranslate(locale, "navigation.games"),
     profile: clientTranslate(locale, "navigation.profile"),
@@ -50,7 +56,9 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<
+    "signoutFailure" | "signoutNetwork" | null
+  >(null);
 
   const close = () => setOpen(false);
   const isActive = (href: string) =>
@@ -73,25 +81,24 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
     try {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) {
-        setLogoutError(
-          "Sign out could not finish. Check your connection and retry.",
-        );
+        setLogoutError("signoutFailure");
         return;
       }
       close();
       router.replace("/");
       router.refresh();
     } catch {
-      setLogoutError(
-        "The sign-out request did not reach TwoPlayer. Check your connection and retry.",
-      );
+      setLogoutError("signoutNetwork");
     } finally {
       setLoggingOut(false);
     }
   }
 
   return (
-    <nav aria-label="Primary navigation" className="flex items-center gap-2">
+    <nav
+      aria-label={t("platform.primaryNav")}
+      className="flex items-center gap-2"
+    >
       <div className="hidden items-center gap-1 md:flex">
         <LanguageSwitcher locale={locale} />
         {publicLinks.map((link) => (
@@ -139,25 +146,25 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
               <Avatar
                 size="sm"
                 role="img"
-                aria-label={`${user.displayName} avatar`}
+                aria-label={t("platform.avatar", { name: user.displayName })}
               >
                 <AvatarImage src={user.avatarUrl ?? undefined} alt="" />
                 <AvatarFallback>{initials(user)}</AvatarFallback>
               </Avatar>
               {user.isGuest ? (
                 <Badge variant="warning" size="sm">
-                  Guest
+                  {t("platform.guest")}
                 </Badge>
               ) : (
                 <span className="text-foreground hidden max-w-28 truncate text-sm font-semibold lg:block">
-                  {user.displayName}
+                  <bdi dir="auto">{user.displayName}</bdi>
                 </span>
               )}
               <Button
                 size="sm"
                 variant="ghost"
                 loading={loggingOut}
-                loadingText="Signing out"
+                loadingText={t("platform.signingOut")}
                 onClick={logout}
                 data-leaves-page
                 aria-describedby={
@@ -172,7 +179,7 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
                   className="border-destructive/40 bg-destructive-subtle text-destructive shadow-dialog absolute end-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-md border p-3 text-xs leading-5"
                   role="alert"
                 >
-                  {logoutError}
+                  {t(`platform.${logoutError}`)}
                 </p>
               ) : null}
             </div>
@@ -203,7 +210,7 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
 
       <div className="md:hidden">
         <IconButton
-          label={open ? "Close navigation" : "Open navigation"}
+          label={open ? t("platform.closeNav") : t("platform.openNav")}
           variant="outline"
           aria-expanded={open}
           aria-controls="mobile-navigation-panel"
@@ -244,18 +251,22 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
                   <Avatar
                     size="sm"
                     role="img"
-                    aria-label={`${user.displayName} avatar`}
+                    aria-label={t("platform.avatar", {
+                      name: user.displayName,
+                    })}
                   >
                     <AvatarImage src={user.avatarUrl ?? undefined} alt="" />
                     <AvatarFallback>{initials(user)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
                     <p className="text-foreground truncate text-sm font-semibold">
-                      {user.isGuest ? "Guest session" : user.displayName}
+                      {user.isGuest
+                        ? t("platform.guestSession")
+                        : user.displayName}
                     </p>
                     <p className="text-muted-foreground truncate text-xs">
                       {user.isGuest
-                        ? "Temporary identity"
+                        ? t("platform.temporaryIdentity")
                         : `@${user.username}`}
                     </p>
                   </div>
@@ -290,7 +301,7 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
                   className="mt-2 w-full"
                   variant="outline"
                   loading={loggingOut}
-                  loadingText="Signing out"
+                  loadingText={t("platform.signingOut")}
                   onClick={logout}
                   data-leaves-page
                   aria-describedby={
@@ -305,7 +316,7 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
                     className="border-destructive/40 bg-destructive-subtle text-destructive rounded-md border p-3 text-sm leading-5"
                     role="alert"
                   >
-                    {logoutError}
+                    {t(`platform.${logoutError}`)}
                   </p>
                 ) : null}
               </>
@@ -330,7 +341,7 @@ export function MobileNav({ user, locale = "en" }: MobileNavProps) {
                   onClick={close}
                   className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
                 >
-                  Continue as guest
+                  {t("platform.continueGuest")}
                 </Link>
               </div>
             )}

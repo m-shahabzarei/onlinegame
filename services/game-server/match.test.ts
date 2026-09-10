@@ -50,7 +50,7 @@ function fixture() {
   const ready = () => {
     for (const slot of [0, 1] as const)
       match.command(reservation.players[slot].playerId, peers[slot]!, {
-        v: 2,
+        v: 3,
         type: "clientReady",
         mapId: "quarantine-yard",
         mapVersion: 2,
@@ -130,8 +130,9 @@ describe("authoritative match instance", () => {
         "SLOT_CONNECTED",
       );
       f.match.command("pa", f.peers[0]!, {
-        v: 2,
+        v: 3,
         type: "fire",
+        triggerSeq: 1,
         seq: 1,
         tick: f.match.tick,
         yaw: 0,
@@ -160,7 +161,7 @@ describe("authoritative match instance", () => {
           f.ready();
           f.advance(110);
           if (kind === "leave")
-            f.match.command("pa", f.peers[0]!, { v: 2, type: "leaveMatch" });
+            f.match.command("pa", f.peers[0]!, { v: 3, type: "leaveMatch" });
           else {
             f.match.disconnect("pa", f.peers[0]!);
             f.advance(1100);
@@ -186,8 +187,9 @@ describe("authoritative match instance", () => {
       Object.assign(p.position, { x: -7, y: 0.015, z: 14 });
       const fire = (seq: number, yaw = 0) =>
         f.match.command("pa", f.peers[0]!, {
-          v: 2,
+          v: 3,
           type: "fire",
+          triggerSeq: 1,
           seq,
           tick: f.match.tick,
           yaw,

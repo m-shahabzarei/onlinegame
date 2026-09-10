@@ -1,8 +1,12 @@
 "use client";
+import { useTranslations } from "@/i18n/provider";
+
 import { useEffect, useState } from "react";
 import type { PresenceSummary as Summary } from "@/domain/lobby";
 import { lobbyRequest } from "./client";
 export function PresenceSummary({ signedIn }: { signedIn: boolean }) {
+  const t = useTranslations();
+
   const [summary, setSummary] = useState<Summary | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -48,8 +52,11 @@ export function PresenceSummary({ signedIn }: { signedIn: boolean }) {
       aria-live="polite"
     >
       {summary
-        ? `${summary.online} online · ${summary.inLobby} in lobby`
-        : "Presence unavailable"}
+        ? t("platform.presence", {
+            online: summary.online,
+            lobby: summary.inLobby,
+          })
+        : t("platform.presenceUnavailable")}
     </p>
   );
 }

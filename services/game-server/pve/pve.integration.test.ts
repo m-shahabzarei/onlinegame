@@ -87,7 +87,7 @@ it("replicates five-wave PvE, damage, held revival and reconnect over two author
     await new Promise<void>((resolve) => ws.once("open", resolve));
     const send = (m: unknown) => ws.send(JSON.stringify(m));
     send({
-      v: 2,
+      v: 3,
       type: "join",
       token: signToken(
         {
@@ -105,7 +105,7 @@ it("replicates five-wave PvE, damage, held revival and reconnect over two author
       messages.find((m) => m.type === "welcome"),
     );
     send({
-      v: 2,
+      v: 3,
       type: "clientReady",
       mapId: "quarantine-yard",
       mapVersion: 2,
@@ -156,7 +156,15 @@ it("replicates five-wave PvE, damage, held revival and reconnect over two author
     Date.now(),
     match.tick,
   );
-  a.send({ v: 2, type: "fire", seq: 1, tick: match.tick, yaw: 0, pitch: 0 });
+  a.send({
+    v: 3,
+    type: "fire",
+    triggerSeq: 1,
+    seq: 1,
+    tick: match.tick,
+    yaw: 0,
+    pitch: 0,
+  });
   const confirmed = await until(() =>
     a.messages.find(
       (m) => m.type === "shotConfirmed" && m.zombieHit?.id === z.id,
@@ -167,7 +175,15 @@ it("replicates five-wave PvE, damage, held revival and reconnect over two author
     weapon: { magazine: 29 },
   });
   const afterHit = z.health;
-  a.send({ v: 2, type: "fire", seq: 1, tick: match.tick, yaw: 0, pitch: 0 });
+  a.send({
+    v: 3,
+    type: "fire",
+    triggerSeq: 1,
+    seq: 1,
+    tick: match.tick,
+    yaw: 0,
+    pitch: 0,
+  });
   await sleep(80);
   expect(z.health).toBe(afterHit);
   teammate.position.x = p.position.x + 1;
@@ -179,13 +195,13 @@ it("replicates five-wave PvE, damage, held revival and reconnect over two author
         m.type === "worldSnapshot" && m.snapshot.players[0]!.life === "DOWNED",
     ),
   );
-  b.send({ v: 2, type: "beginRevive", targetId: p.id, seq: 1 });
+  b.send({ v: 3, type: "beginRevive", targetId: p.id, seq: 1 });
   await until(() => match.pve.revive.current ?? undefined);
-  b.send({ v: 2, type: "cancelRevive", seq: 2 });
+  b.send({ v: 3, type: "cancelRevive", seq: 2 });
   await until(() => (match.pve.revive.current === null ? true : undefined));
-  b.send({ v: 2, type: "beginRevive", targetId: p.id, seq: 3 });
+  b.send({ v: 3, type: "beginRevive", targetId: p.id, seq: 3 });
   await sleep(250);
-  b.send({ v: 2, type: "beginRevive", targetId: p.id, seq: 4 });
+  b.send({ v: 3, type: "beginRevive", targetId: p.id, seq: 4 });
   await until(() => (p.life === "ALIVE" ? true : undefined));
   expect(p.health).toBe(45);
   await until(() =>

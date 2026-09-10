@@ -1,4 +1,7 @@
-import { RIFLE } from "../../../src/game/shared/config";
+import {
+  resolveWeaponStats,
+  type WeaponDefinition,
+} from "../../../src/game/shared/phase6";
 import { ZombieAI } from "../../../src/game/shared/pve";
 import type { Vec3 } from "../../../src/game/shared/protocol";
 import { ZOMBIES, type PvERules } from "./definitions";
@@ -19,9 +22,10 @@ export function rayBox(
   hx: number,
   hy: number,
   hz: number,
+  range: number = resolveWeaponStats("ar-01", 0).range,
 ) {
   let near = 0,
-    far: number = RIFLE.range;
+    far: number = range;
   const axes = [
     [origin.x, direction.x, x, hx],
     [origin.y, direction.y, y, hy],
@@ -48,9 +52,15 @@ export class DamageSystem {
     readonly rules: PvERules,
     readonly emit: EmitEvent,
   ) {}
-  hit(origin: Vec3, direction: Vec3, wallDistance: number, viewTick: number) {
+  hit(
+    origin: Vec3,
+    direction: Vec3,
+    wallDistance: number,
+    viewTick: number,
+    range = resolveWeaponStats("ar-01", 0).range,
+  ) {
     const began = performance.now();
-    let nearest = wallDistance,
+    let nearest = Math.min(wallDistance, range),
       hit: {
         zombie: ZombieEntity;
         region: "head" | "body";
@@ -88,6 +98,7 @@ export class DamageSystem {
         headRadius,
         headRadius,
         headRadius,
+        range,
       );
       const body = rayBox(
         origin,
@@ -98,6 +109,7 @@ export class DamageSystem {
         d.radius,
         d.height * 0.35,
         d.radius,
+        range,
       );
       const region = head <= body ? "head" : "body",
         distance = Math.min(head, body);
@@ -109,17 +121,31 @@ export class DamageSystem {
     this.rewindCostMs = performance.now() - began;
     return hit;
   }
-  apply(z: ZombieEntity, region: "head" | "body", now: number, tick: number) {
+  apply(
+    z: ZombieEntity,
+    region: "head" | "body",
+    now: number,
+    tick: number,
+    stats: Pick<
+      WeaponDefinition,
+      "baseDamage" | "headshotMultiplier"
+    > = resolveWeaponStats("ar-01", 0),
+    playerId = "",
+  ) {
     if (z.health <= 0 || z.state === ZombieAI.Dead) return false;
-    const amount = Math.ceil(
-      RIFLE.targetDamage *
-        (region === "head"
-          ? this.rules.headMultiplier
-          : this.rules.bodyMultiplier),
+    const amount = Math.min(
+      z.health,
+      Math.ceil(
+        stats.baseDamage *
+          (region === "head"
+            ? stats.headshotMultiplier
+            : this.rules.bodyMultiplier),
+      ),
     );
     z.health = Math.max(0, z.health - amount);
     z.tick = tick;
     this.emit("zombieDamaged", {
+      playerId,
       entityId: z.id,
       revision: z.revision,
       position: { ...z.position },
@@ -132,6 +158,7 @@ export class DamageSystem {
       z.attackTargetId = "";
       this.waves.defeated();
       this.emit("zombieDied", {
+        playerId,
         entityId: z.id,
         revision: z.revision,
         position: { ...z.position },
