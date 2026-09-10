@@ -1,3 +1,5 @@
 {
-  "crons": [{ "path": "/api/gameplay/sweep", "schedule": "* * * * *" }]
+  "framework": "nextjs",
+  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then npx prisma migrate deploy && npx prisma db execute --file prisma/seed-catalog.sql --schema prisma/schema.prisma; fi && npm run build",
+  "crons": [{ "path": "/api/gameplay/sweep", "schedule": "0 0 * * *" }]
 }
