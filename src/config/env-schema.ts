@@ -192,7 +192,20 @@ export function parsePublicEnv(
 export function parseServerEnv(
   input: Record<string, string | undefined>,
 ): ServerEnv {
-  const parsed = serverEnvInputSchema.parse(input);
+  // Vercel's Upstash integration provisions KV_REST_API_* automatically.
+  // Select the pair together so a partial custom override never mixes databases.
+  const useVercelRedis =
+    !input.UPSTASH_REDIS_REST_URL?.trim() &&
+    !input.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const parsed = serverEnvInputSchema.parse({
+    ...input,
+    ...(useVercelRedis
+      ? {
+          UPSTASH_REDIS_REST_URL: input.KV_REST_API_URL,
+          UPSTASH_REDIS_REST_TOKEN: input.KV_REST_API_TOKEN,
+        }
+      : {}),
+  });
 
   return {
     database: {

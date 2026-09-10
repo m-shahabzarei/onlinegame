@@ -37,6 +37,52 @@ describe("environment validation", () => {
     ).toThrow(/postgres/i);
   });
 
+  it("accepts Vercel's managed Redis variables when custom values are blank", () => {
+    const result = parseServerEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://localhost:5432/twoplayer",
+      REALTIME_PROVIDER: "ably",
+      REALTIME_SERVER_API_KEY: "test-only-ably-key",
+      UPSTASH_REDIS_REST_URL: "",
+      UPSTASH_REDIS_REST_TOKEN: " ",
+      KV_REST_API_URL: "https://managed-redis.example.test",
+      KV_REST_API_TOKEN: "test-only-managed-token",
+    });
+    expect(result.realtime.redisUrl).toBe("https://managed-redis.example.test");
+    expect(result.realtime.redisToken).toBe("test-only-managed-token");
+  });
+
+  it("keeps custom Redis credentials together and rejects partial overrides", () => {
+    const config = {
+      DATABASE_URL: "postgresql://localhost:5432/twoplayer",
+      REALTIME_PROVIDER: "ably",
+      REALTIME_SERVER_API_KEY: "test-only-ably-key",
+      UPSTASH_REDIS_REST_URL: "https://custom-redis.example.test",
+      UPSTASH_REDIS_REST_TOKEN: "test-only-custom-token",
+      KV_REST_API_URL: "https://managed-redis.example.test",
+      KV_REST_API_TOKEN: "test-only-managed-token",
+    };
+    const result = parseServerEnv(config);
+    expect(result.realtime.redisUrl).toBe(config.UPSTASH_REDIS_REST_URL);
+    expect(result.realtime.redisToken).toBe(config.UPSTASH_REDIS_REST_TOKEN);
+    expect(() =>
+      parseServerEnv({ ...config, UPSTASH_REDIS_REST_TOKEN: "" }),
+    ).toThrow(/UPSTASH_REDIS_REST_TOKEN/);
+    expect(() =>
+      parseServerEnv({ ...config, UPSTASH_REDIS_REST_URL: "" }),
+    ).toThrow(/UPSTASH_REDIS_REST_URL/);
+  });
+
+  it("requires HTTPS for managed Redis endpoints", () => {
+    expect(() =>
+      parseServerEnv({
+        DATABASE_URL: "postgresql://localhost:5432/twoplayer",
+        KV_REST_API_URL: "http://managed-redis.example.test",
+        KV_REST_API_TOKEN: "test-only-token",
+      }),
+    ).toThrow(/Redis REST must use HTTPS/);
+  });
+
   it("allows an explicit ephemeral development adapter without a database", () => {
     expect(
       parseServerEnv({ AUTH_MODE: "development" }).database.url,

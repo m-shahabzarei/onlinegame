@@ -25,6 +25,11 @@ Before enabling play, configure the Ably and Upstash variables from
 join/control secrets and production origins, and verify its health/readiness.
 Keep `TWOPLAYER_FLAG_GAME_AVAILABLE=0` until those services are ready.
 
+The Upstash Marketplace integration's `KV_REST_API_URL` and `KV_REST_API_TOKEN`
+are accepted automatically when both `UPSTASH_REDIS_REST_*` overrides are empty.
+Custom overrides take precedence as a pair; a partial pair fails validation for
+the Ably runtime. Keep all Redis credentials server-only.
+
 ## Cleanup scheduling on Hobby
 
 Vercel Hobby permits cron jobs only once per day. The checked-in schedule is a
