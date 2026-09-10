@@ -44,3 +44,27 @@ schedule. Do not publish the secret in a URL or commit it to this repository.
 Check the successful migration output and Ready deployment in Vercel, then visit
 the production homepage, `/games`, and `/api/health`. Full gameplay readiness also
 requires `/api/health/ready` and the two-client smoke in `docs/phase-7-operations.md`.
+
+## Provisioned production services (2026-09-10)
+
+- Web: https://onlinegame-mu.vercel.app on Vercel Hobby.
+- PostgreSQL: Prisma `onlinegame-postgres`, Production integration.
+- Redis: Upstash `onlinegame-redis`, Production integration.
+- Lobby events: Ably `onlinegame-production`, restricted publish/subscribe key.
+- Gameplay: https://onlinegame-server.onrender.com, Render Free, Virginia,
+  one Docker instance from `services/game-server/Dockerfile`, repository root
+  build context, `/ready` health check. WebSocket path: `/gameplay`.
+- Minute cleanup: cron-job.org job `8425598`, authenticated GET to the web
+  sweep endpoint. Manual and scheduled executions returned HTTP 200.
+
+Production join/control credentials are independent, and the cron bearer token
+is stored only in Vercel and the scheduler. Credentials are not in this document.
+
+Render Free sleeps when inactive; waking can take 50 seconds or more. A first
+game attempt can therefore require retrying. This deployment is suitable for
+testing within free-tier quotas, not guaranteed always-on service.
+
+The document CSP permits `'wasm-unsafe-eval'` for bundled Rapier physics while
+keeping JavaScript `'unsafe-eval'` disabled in production. Test this distinction
+with `e2e/csp.spec.ts` against the HTTPS production URL. A rejected WASM load can
+currently surface as the game's generic WebGL initialization failure message.

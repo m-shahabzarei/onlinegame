@@ -42,9 +42,9 @@ const nextConfig: NextConfig = {
     const connectSources = ["'self'", "ws:", "wss:"];
     const csp = [
       "default-src 'self'",
-      // Next's App Router emits small hydration scripts. Keep inline scripts
-      // scoped by the same-origin policy; never enable unsafe-eval in prod.
-      "script-src 'self' 'unsafe-inline'" +
+      // App Router hydration uses inline scripts; Rapier physics requires WASM.
+      // The WASM permission does not enable JavaScript eval in production.
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'" +
         (isProduction ? "" : " 'unsafe-eval'"),
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
