@@ -265,9 +265,8 @@ export async function createGameplayService(options: ServiceOptions) {
       if (Date.now() - lastSeen > LIMITS.silenceMs) ws.terminate();
       else ws.ping();
     }, LIMITS.heartbeatMs);
-    ws.on("pong", () => {
-      lastSeen = Date.now();
-    });
+    // Only application messages renew the player lease. Transport-level pongs
+    // can continue from a proxy or a browser whose game runtime has stopped.
     ws.on("message", (raw, isBinary) => {
       try {
         if (isBinary || !frameBudget.consume(Date.now()))

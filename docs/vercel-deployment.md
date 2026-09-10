@@ -68,3 +68,21 @@ The document CSP permits `'wasm-unsafe-eval'` for bundled Rapier physics while
 keeping JavaScript `'unsafe-eval'` disabled in production. Test this distinction
 with `e2e/csp.spec.ts` against the HTTPS production URL. A rejected WASM load can
 currently surface as the game's generic WebGL initialization failure message.
+
+### Release verification
+
+Commit `812bda7` deployed the physics CSP correction. The HTTPS browser CSP
+regression passed, as did TypeScript, targeted ESLint and formatting checks.
+Two authenticated production guests created/joined a private room and started
+a shared match. Browser frames verified synchronized movement and authoritative
+ammunition changes. A direct WebSocket smoke also verified disconnect/reconnect
+with the same player identity and cooperative match termination on leave.
+
+Full browser reload stability is not certified: two simultaneous software-rendered
+Chrome clients experienced reconnects and `SLOT_CONNECTED` errors. A complete wave,
+shop purchases, and sustained-load testing were not verified in this deployment.
+The free instance's capacity and cold starts remain operational limitations.
+
+Application-silent sockets now expire even if transport pongs continue, and
+duplicate-slot rejection uses bounded reconnect retries. A real WebSocket
+regression verifies the stale slot is freed after the application silence limit.

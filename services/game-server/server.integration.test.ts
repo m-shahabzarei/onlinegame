@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
-import { SIMULATION } from "../../src/game/shared/config";
+import { LIMITS, SIMULATION } from "../../src/game/shared/config";
 import {
   neutralInput,
   serverMessageSchema,
@@ -38,7 +38,7 @@ describe("real WebSocket service integration", () => {
     await service?.close();
     service = undefined;
   });
-  async function setup() {
+  async function setup(startupMs = 10000) {
     const lifecycle: string[] = [];
     service = await createGameplayService({
       joinSecret,
@@ -47,7 +47,7 @@ describe("real WebSocket service integration", () => {
       simulation: {
         ...SIMULATION,
         countdownMs: 100,
-        startupMs: 10000,
+        startupMs,
         reconnectMs: 2500,
       },
       lifecycle: async (_id, _runtime, state) => {
@@ -117,6 +117,20 @@ describe("real WebSocket service integration", () => {
     }
     return { reservation, ticket, client, lifecycle, url, wsUrl };
   }
+  it("releases an application-silent player even while transport pongs continue", async () => {
+    const f = await setup(20000);
+    const silent = await f.client(f.ticket(0));
+    await until(() => silent.messages.find((m) => m.type === "welcome"));
+    // ws responds to server pings automatically; no application ping is sent.
+    await until(
+      () => (silent.ws.readyState === WebSocket.CLOSED ? true : undefined),
+      LIMITS.silenceMs + LIMITS.heartbeatMs + 1000,
+    );
+    const restored = await f.client(f.ticket(0));
+    expect(
+      await until(() => restored.messages.find((m) => m.type === "welcome")),
+    ).toMatchObject({ playerId: "pa" });
+  }, 15000);
   it("rejects invalid identity, expiry, token reuse and disallowed origins", async () => {
     const f = await setup();
     const invalid = await f.client(f.ticket(0, { userId: "outsider" }));

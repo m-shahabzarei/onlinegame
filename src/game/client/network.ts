@@ -130,7 +130,6 @@ export class GameplayNetwork {
               "UNAUTHORIZED",
               "MATCH_UNAVAILABLE",
               "PROTOCOL_MISMATCH",
-              "SLOT_CONNECTED",
             ].includes(message.code);
             const error =
               message.code === "SLOT_CONNECTED"
